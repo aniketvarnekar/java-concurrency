@@ -1,0 +1,75 @@
+# =========================
+# IntelliJ IDEA
+# =========================
+.idea/
+*.iml
+*.iws
+out/
+
+# User-specific files
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/dictionaries/
+.idea/shelf/
+
+# Sensitive or environment-specific
+.idea/**/usage.statistics.xml
+.idea/**/aws.xml
+.idea/**/credentials.xml
+
+# =========================
+# Java / JVM
+# =========================
+*.class
+*.log
+*.ctxt
+
+# Package Files
+*.jar
+*.war
+*.ear
+
+# JVM crash logs
+hs_err_pid*
+
+# =========================
+# Build tools
+# =========================
+
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.versionsBackup
+pom.xml.next
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Environment files
+# =========================
+.env
+*.env
+*.local
+
+# =========================
+# Logs and temp
+# =========================
+logs/
+tmp/
+*.tmp
+*.swp
+
+# =========================
+# VS Code (if mixed editors)
+# =========================
+.vscode/
