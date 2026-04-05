@@ -30,6 +30,9 @@ public class DeadlockDemo {
     private static final Object LOCK_A = new Object();
     private static final Object LOCK_B = new Object();
 
+    private static final Object FIXED_LOCK_A = new Object();
+    private static final Object FIXED_LOCK_B = new Object();
+
     // -----------------------------------------------------------------------
     // Part 1: Induce a deadlock
     // -----------------------------------------------------------------------
@@ -122,11 +125,11 @@ public class DeadlockDemo {
         Runnable orderedTask = () -> {
             String name = Thread.currentThread().getName();
             System.out.printf("[%s] acquiring LOCK_A...%n", name);
-            synchronized (LOCK_A) {
+            synchronized (FIXED_LOCK_A) {
                 System.out.printf("[%s] acquired  LOCK_A%n", name);
                 safeSleep(50);
                 System.out.printf("[%s] acquiring LOCK_B...%n", name);
-                synchronized (LOCK_B) {
+                synchronized (FIXED_LOCK_B) {
                     System.out.printf("[%s] acquired  LOCK_B -- doing work%n", name);
                     safeSleep(30); // simulate work inside both locks
                 }

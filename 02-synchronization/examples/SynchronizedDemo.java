@@ -163,8 +163,8 @@ public class SynchronizedDemo {
         }, "bank-worker-1");
 
         Thread t2 = new Thread(() -> {
-            bob.transfer(alice, 150);
-            bob.transfer(alice, 50);
+            alice.transfer(bob, 200);
+            alice.transfer(bob, 100);
         }, "bank-worker-2");
 
         t1.start(); t2.start();
