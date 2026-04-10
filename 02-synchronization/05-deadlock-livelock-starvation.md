@@ -12,12 +12,7 @@ Understanding these failure modes is also essential for interpreting diagnostic 
 
 ### Deadlock
 
-A deadlock occurs when two or more threads each hold a resource and are each waiting to acquire a resource held by another, forming a cycle of dependencies that cannot be broken. Four conditions, identified by Coffman et al., are jointly necessary for a deadlock to occur:
-
-1. **Mutual exclusion**: at least one resource is held in a non-shareable mode — only one thread can use it at a time.
-2. **Hold and wait**: a thread holding at least one resource is waiting to acquire additional resources held by other threads.
-3. **No preemption**: resources cannot be taken away from a thread forcibly; they are released only voluntarily.
-4. **Circular wait**: there exists a set of threads T1, T2, ..., Tn such that T1 is waiting for a resource held by T2, T2 is waiting for a resource held by T3, ..., and Tn is waiting for a resource held by T1.
+A deadlock occurs when two or more threads each hold a resource and are each waiting to acquire a resource held by another, forming a cycle of dependencies that cannot be broken. Four conditions, identified by Coffman et al., are jointly necessary for a deadlock to occur. Mutual exclusion means at least one resource is held in a non-shareable mode — only one thread can use it at a time. Hold and wait means a thread holding at least one resource is also waiting to acquire resources held by other threads. No preemption means resources cannot be taken away from a thread forcibly; they are released only voluntarily. Circular wait means there exists a set of threads T1, T2, ..., Tn such that T1 waits for a resource held by T2, T2 waits for a resource held by T3, and Tn waits for a resource held by T1.
 
 ```
 Thread Alpha holds Lock-A, waiting for Lock-B
@@ -257,111 +252,6 @@ if (deadlockedIds != null) {
 ```
 
 This can be run periodically on a background thread to detect deadlocks at runtime and emit an alert or thread dump before the application becomes completely unresponsive.
-
-## Code Snippet
-
-```java
-// Demonstrates deadlock with two threads acquiring locks in opposite order,
-// detects it using ThreadMXBean, and shows the fixed version with consistent
-// lock ordering.
-//
-// Run: javac DeadlockAndFixDemo.java && java DeadlockAndFixDemo
-
-import java.lang.management.ManagementFactory;
-import java.lang.management.ThreadInfo;
-import java.lang.management.ThreadMXBean;
-
-public class DeadlockAndFixDemo {
-
-    static final Object LOCK_A = new Object();
-    static final Object LOCK_B = new Object();
-
-    // --- Part 1: Deadlock ---
-    static void startDeadlock() {
-        Thread alpha = new Thread(() -> {
-            synchronized (LOCK_A) {
-                System.out.println("[Thread-Alpha] acquired LOCK_A");
-                safeSleep(100);
-                System.out.println("[Thread-Alpha] waiting for LOCK_B...");
-                synchronized (LOCK_B) {
-                    System.out.println("[Thread-Alpha] acquired LOCK_B -- unreachable in deadlock");
-                }
-            }
-        }, "Thread-Alpha");
-
-        Thread beta = new Thread(() -> {
-            synchronized (LOCK_B) {
-                System.out.println("[Thread-Beta] acquired LOCK_B");
-                safeSleep(100);
-                System.out.println("[Thread-Beta] waiting for LOCK_A...");
-                synchronized (LOCK_A) {
-                    System.out.println("[Thread-Beta] acquired LOCK_A -- unreachable in deadlock");
-                }
-            }
-        }, "Thread-Beta");
-
-        alpha.setDaemon(true);
-        beta.setDaemon(true);
-        alpha.start();
-        beta.start();
-    }
-
-    static void detectDeadlock() throws InterruptedException {
-        Thread.sleep(500); // give deadlock time to form
-        ThreadMXBean tmx = ManagementFactory.getThreadMXBean();
-        long[] deadlocked = tmx.findDeadlockedThreads();
-        if (deadlocked == null) {
-            System.out.println("No deadlock detected.");
-            return;
-        }
-        System.out.println("\n*** DEADLOCK DETECTED involving " + deadlocked.length + " thread(s) ***");
-        ThreadInfo[] infos = tmx.getThreadInfo(deadlocked, true, true);
-        for (ThreadInfo info : infos) {
-            System.out.printf("  Thread '%s' [state=%s]%n",
-                    info.getThreadName(), info.getThreadState());
-            System.out.printf("    waiting to lock : %s%n", info.getLockName());
-            System.out.printf("    lock is held by : %s%n", info.getLockOwnerName());
-        }
-    }
-
-    // --- Part 2: Fixed with consistent lock ordering ---
-    static void startFixed() throws InterruptedException {
-        System.out.println("\n=== Fixed version: consistent lock ordering (always A then B) ===");
-
-        Runnable orderedTask = () -> {
-            synchronized (LOCK_A) {        // ALWAYS acquire A first
-                System.out.printf("[%s] acquired LOCK_A%n", Thread.currentThread().getName());
-                safeSleep(50);
-                synchronized (LOCK_B) {    // ALWAYS acquire B second
-                    System.out.printf("[%s] acquired LOCK_B -- doing work%n",
-                            Thread.currentThread().getName());
-                }
-            }
-            System.out.printf("[%s] released both locks%n", Thread.currentThread().getName());
-        };
-
-        Thread t1 = new Thread(orderedTask, "Fixed-Alpha");
-        Thread t2 = new Thread(orderedTask, "Fixed-Beta");
-        t1.start();
-        t2.start();
-        t1.join();
-        t2.join();
-        System.out.println("Fixed version completed without deadlock.");
-    }
-
-    static void safeSleep(long ms) {
-        try { Thread.sleep(ms); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-    }
-
-    public static void main(String[] args) throws InterruptedException {
-        System.out.println("=== Part 1: Inducing deadlock ===");
-        startDeadlock();
-        detectDeadlock();
-
-        startFixed();
-    }
-}
-```
 
 ## Gotchas
 

@@ -83,45 +83,6 @@ if (!map.containsKey(key)) {      // atomic check
 
 The check and the put are each atomic in isolation. The compound action of "check then conditionally put" is not. The correct solution is either to use `map.putIfAbsent(key, value)`, which is itself a single atomic operation, or to hold an external lock across both operations. `ConcurrentHashMap` provides `putIfAbsent`, `computeIfAbsent`, and `merge` precisely to eliminate this class of race condition.
 
-## Code Snippet
-
-```java
-// Demonstrates a read-modify-write race condition.
-// Two threads increment a shared counter 100,000 times each.
-// Without synchronization, the final value is almost always less than 200,000.
-public class UnsafeCounter {
-
-    private static int counter = 0;
-
-    public static void main(String[] args) throws InterruptedException {
-        final int INCREMENTS_PER_THREAD = 100_000;
-
-        Thread t1 = new Thread(() -> {
-            for (int i = 0; i < INCREMENTS_PER_THREAD; i++) {
-                counter++; // read-modify-write: NOT atomic
-            }
-        }, "incrementer-1");
-
-        Thread t2 = new Thread(() -> {
-            for (int i = 0; i < INCREMENTS_PER_THREAD; i++) {
-                counter++; // read-modify-write: NOT atomic
-            }
-        }, "incrementer-2");
-
-        t1.start();
-        t2.start();
-        t1.join();
-        t2.join();
-
-        System.out.println("Expected : " + (2 * INCREMENTS_PER_THREAD));
-        System.out.println("Actual   : " + counter);
-        System.out.println("Lost updates: " + (2 * INCREMENTS_PER_THREAD - counter));
-    }
-}
-```
-
-Running this program will typically print an actual value between 100,000 and 200,000. The exact number varies by run because it depends on how the OS schedules the two threads. On a single-core machine the race is less frequent but still occurs because the JVM itself can preempt threads between bytecode instructions. On a multi-core machine, both threads can execute their load-add-store sequences truly in parallel, making collisions more frequent.
-
 ## Gotchas
 
 **Correct output on one machine does not mean the code is correct.** A program with a race condition may produce correct results every time on a single-core machine with a particular JVM and OS, and then fail regularly on a dual-core machine or a different JVM version. The absence of observed failures is not a proof of correctness. Race conditions must be reasoned about structurally, not tested away empirically.

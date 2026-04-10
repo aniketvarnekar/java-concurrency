@@ -16,8 +16,8 @@ Each note is self-contained but they are ordered to build on each other. Reading
 
 ## Contents — Examples
 
-| File | Description |
-|------|-------------|
-| [examples/RaceConditionDemo.java](examples/RaceConditionDemo.java) | Two threads increment a shared counter 100,000 times with no synchronization, exposing lost updates; also demonstrates a check-then-act race in lazy initialization |
-| [examples/SynchronizedDemo.java](examples/SynchronizedDemo.java) | BankAccount-style example covering synchronized instance methods, static methods, synchronized blocks on a private lock, and reentrant locking via a recursive method |
-| [examples/DeadlockDemo.java](examples/DeadlockDemo.java) | Two threads acquire two locks in opposite order to produce a deadlock, detects it with ThreadMXBean, then shows the fixed version using consistent lock ordering |
+| Folder | Description |
+|--------|-------------|
+| [examples/raceconditiondemo](examples/raceconditiondemo/) | Two threads increment a shared counter 100,000 times with no synchronization, exposing lost updates; also demonstrates a check-then-act race in lazy initialization |
+| [examples/synchronizeddemo](examples/synchronizeddemo/) | BankAccount-style example covering synchronized instance methods, static methods, synchronized blocks on a private lock, and reentrant locking via a recursive method |
+| [examples/deadlockdemo](examples/deadlockdemo/) | Two threads acquire two locks in opposite order to produce a deadlock, detects it with ThreadMXBean, then shows the fixed version using consistent lock ordering |
