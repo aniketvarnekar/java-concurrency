@@ -129,64 +129,6 @@ private static class Holder {
 public static Helper getInstance() { return Holder.INSTANCE; }
 ```
 
-## Code Snippet
-
-This is the classic two-thread reordering demonstration. Without barriers, both threads can observe that the other thread's flag is still 0 even after setting their own — because the store of their own flag and the load of the other's flag can be reordered.
-
-```java
-public class ReorderingDemo {
-
-    // Without volatile, the CPU may reorder the store and the load
-    // such that both threads see x=0 and y=0 simultaneously.
-    // With volatile on both, ordering is enforced.
-    static volatile int x = 0;
-    static volatile int y = 0;
-
-    static int readX, readY;
-
-    public static void main(String[] args) throws InterruptedException {
-        int reorderedCount = 0;
-        int iterations = 100_000;
-
-        for (int i = 0; i < iterations; i++) {
-            x = 0;
-            y = 0;
-            readX = -1;
-            readY = -1;
-
-            Thread t1 = new Thread(() -> {
-                x = 1;          // write x
-                readY = y;      // read y
-            }, "writer-x");
-
-            Thread t2 = new Thread(() -> {
-                y = 1;          // write y
-                readX = x;      // read x
-            }, "writer-y");
-
-            t1.start();
-            t2.start();
-            t1.join();
-            t2.join();
-
-            // If reordering occurred: both threads read 0 before the other's write
-            // was visible. This can only happen if the store of x/y was delayed
-            // past the load of y/x.
-            if (readX == 0 && readY == 0) {
-                reorderedCount++;
-            }
-        }
-
-        System.out.println("Iterations: " + iterations);
-        System.out.println("Apparent reorderings observed: " + reorderedCount);
-        System.out.println("With volatile on x and y, this number should be 0.");
-        System.out.println("Remove volatile from x and y to observe reorderings.");
-    }
-}
-```
-
-With `volatile` on both `x` and `y`, the count of reorderings should be zero. Remove `volatile` and the count may rise, especially under high parallelism or on weakly-ordered hardware.
-
 ## Gotchas
 
 ### Reordering Is Not a Bug in the CPU or JVM

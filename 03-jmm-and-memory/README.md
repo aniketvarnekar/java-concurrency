@@ -13,7 +13,7 @@ The Java Memory Model (JMM) is the formal specification that governs how threads
 
 ## Contents — Examples
 
-| File | Description |
-|------|-------------|
-| [examples/VisibilityDemo.java](examples/VisibilityDemo.java) | Demonstrates a visibility bug with a stop flag and its fix using volatile |
-| [examples/FinalFieldDemo.java](examples/FinalFieldDemo.java) | Demonstrates safe publication of an object via final fields compared to non-final |
+| Folder | Description |
+|--------|-------------|
+| [examples/visibilitydemo/](examples/visibilitydemo/) | Demonstrates a visibility bug with a stop flag and its fix using volatile |
+| [examples/finalfielddemo/](examples/finalfielddemo/) | Demonstrates safe publication of an object via final fields compared to non-final |

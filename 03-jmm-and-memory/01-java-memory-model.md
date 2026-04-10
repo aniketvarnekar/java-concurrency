@@ -80,44 +80,6 @@ The JMM is a programming model, not a hardware specification. Different CPU arch
 
 This architecture means a write by CPU 0 travels: register → L1 → L2 → L3 → main memory. A read by CPU 1 travels the same chain in reverse. Without cache coherence protocols and memory barriers, CPU 1 might read a value that is still sitting in CPU 0's L1 or L2 cache. The JVM uses CPU-specific barrier instructions (MFENCE, LOCK prefix on x86; DMB on ARM) to force coherence when the JMM requires it.
 
-## Code Snippet
-
-This example demonstrates a visibility bug. Without `volatile`, the JIT compiler may keep `running` in a register and never re-read it from memory, causing the loop to spin forever. The flag is set by the main thread but may never be observed by the worker.
-
-```java
-public class VisibilityBug {
-
-    // Without volatile, the JIT may hoist this read out of the loop entirely.
-    // The worker thread never sees the update made by the main thread.
-    private static boolean running = true;
-
-    public static void main(String[] args) throws InterruptedException {
-        Thread worker = new Thread(() -> {
-            long iterations = 0;
-            while (running) {
-                iterations++;
-            }
-            System.out.println("Worker stopped after " + iterations + " iterations");
-        }, "worker");
-
-        worker.start();
-
-        Thread.sleep(100); // Let the worker get into the loop
-
-        System.out.println("Main: setting running = false");
-        running = false;
-
-        worker.join(2000); // Wait up to 2 seconds
-        if (worker.isAlive()) {
-            System.out.println("Worker is still running — visibility bug demonstrated");
-            System.exit(0);
-        }
-    }
-}
-```
-
-Adding `volatile` to the declaration of `running` fixes the bug by requiring every read to go through main memory and every write to be flushed immediately.
-
 ## Gotchas
 
 ### The JMM Does Not Define Timing, Only Ordering
