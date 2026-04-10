@@ -86,47 +86,6 @@ When the OS scheduler preempts a running thread and schedules a different thread
 
 Context switching is not free. A switch involves at minimum hundreds of nanoseconds of kernel time, plus cache pollution: the newly scheduled thread's data may not be in the L1/L2 cache, causing cache misses that cost tens to hundreds of nanoseconds each. Systems that create far more threads than CPU cores can degrade significantly due to context switch overhead and cache thrashing.
 
-## Code Snippet
-
-This program starts two threads and demonstrates that they share a static field on the heap while maintaining independent local variables on their respective stacks.
-
-```java
-public class SharedHeapDemo {
-
-    // Stored in the method area / heap — visible to all threads.
-    static int sharedCounter = 0;
-
-    public static void main(String[] args) throws InterruptedException {
-        Thread incrementer = new Thread(() -> {
-            // 'localValue' lives on THIS thread's stack only.
-            int localValue = 100;
-            sharedCounter = localValue + 1;
-            System.out.println("Incrementer: localValue=" + localValue
-                    + ", sharedCounter=" + sharedCounter);
-        }, "incrementer");
-
-        Thread reader = new Thread(() -> {
-            int localValue = 999; // independent from incrementer's localValue
-            // Small sleep to let incrementer run first (not a sync guarantee).
-            try { Thread.sleep(50); } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            System.out.println("Reader:      localValue=" + localValue
-                    + ", sharedCounter=" + sharedCounter);
-        }, "reader");
-
-        incrementer.start();
-        reader.start();
-        incrementer.join();
-        reader.join();
-
-        System.out.println("Main: final sharedCounter=" + sharedCounter);
-    }
-}
-```
-
-Run: `javac SharedHeapDemo.java && java SharedHeapDemo`
-
 ## Gotchas
 
 ### Shared heap without synchronization is undefined behavior

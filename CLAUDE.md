@@ -100,7 +100,7 @@ Each section `README.md` must contain:
 ### Folder structure
 
 Each runnable example lives in its own folder under `examples/`, named in
-PascalCase (e.g. `examples/DeadlockDemo/`). The folder may contain as many
+lowercase (e.g. `examples/deadlockdemo/`). The folder may contain as many
 `.java` files as the concept requires. Split types across files the same way
 you would in a normal IntelliJ IDEA project. Use a package name that mirrors
 the folder path, e.g. `package examples.deadlockdemo;`.

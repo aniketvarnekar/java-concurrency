@@ -132,10 +132,7 @@ This is almost always a bug. Prefer `lock.wait(timeout)` if you need to pause ex
 
 ### Thread.interrupt and isInterrupted
 
-`interrupt()` sets the interrupt flag on the target thread. It does not forcibly stop the thread. The effect depends on what the target thread is doing:
-
-- If the thread is in `WAITING` or `TIMED_WAITING` (blocked in `sleep()`, `wait()`, or `join()`), it wakes immediately and an `InterruptedException` is thrown. The interrupt flag is cleared when the exception is thrown.
-- If the thread is `RUNNABLE`, the flag is set but nothing happens until the thread explicitly checks it via `Thread.interrupted()` (clears the flag and returns its value) or `Thread.currentThread().isInterrupted()` (returns the flag value without clearing it).
+`interrupt()` sets the interrupt flag on the target thread. It does not forcibly stop the thread. If the thread is in `WAITING` or `TIMED_WAITING` (blocked in `sleep()`, `wait()`, or `join()`), it wakes immediately and an `InterruptedException` is thrown; the interrupt flag is cleared when the exception is thrown. If the thread is `RUNNABLE`, the flag is set but nothing happens until the thread explicitly checks it via `Thread.interrupted()` (clears the flag and returns its value) or `Thread.currentThread().isInterrupted()` (returns the flag value without clearing it).
 
 The cooperative interruption pattern is:
 
@@ -163,101 +160,6 @@ try {
 ```java
 System.out.println("Running on: " + Thread.currentThread().getName());
 ```
-
-## Code Snippet
-
-This program demonstrates all three creation mechanisms, uses `join()` to wait for results, and shows proper `InterruptedException` handling.
-
-```java
-import java.util.concurrent.Callable;
-import java.util.concurrent.FutureTask;
-
-public class ThreeWaysDemo {
-
-    // --- Mechanism 1: Thread subclass ---
-    static class SubclassThread extends Thread {
-        SubclassThread() {
-            super("subclass-thread");
-        }
-
-        @Override
-        public void run() {
-            System.out.println("[" + getName() + "] running via Thread subclass");
-            for (int i = 0; i < 3; i++) {
-                if (Thread.currentThread().isInterrupted()) {
-                    System.out.println("[" + getName() + "] interrupted, stopping early");
-                    return;
-                }
-                System.out.println("[" + getName() + "] step " + i);
-            }
-        }
-    }
-
-    // --- Mechanism 2: Runnable ---
-    static class RunnableTask implements Runnable {
-        @Override
-        public void run() {
-            System.out.println("[" + Thread.currentThread().getName() + "] running via Runnable");
-            try {
-                Thread.sleep(100);
-            } catch (InterruptedException e) {
-                // Restore the interrupt flag so callers can detect it.
-                Thread.currentThread().interrupt();
-                System.out.println("[" + Thread.currentThread().getName() + "] sleep interrupted");
-                return;
-            }
-            System.out.println("[" + Thread.currentThread().getName() + "] Runnable finished");
-        }
-    }
-
-    // --- Mechanism 3: Callable + FutureTask ---
-    static class SumCallable implements Callable<Long> {
-        private final int limit;
-
-        SumCallable(int limit) {
-            this.limit = limit;
-        }
-
-        @Override
-        public Long call() {
-            System.out.println("[" + Thread.currentThread().getName() + "] running via Callable");
-            long sum = 0;
-            for (int i = 1; i <= limit; i++) {
-                sum += i;
-            }
-            return sum;
-        }
-    }
-
-    public static void main(String[] args) throws Exception {
-        // Mechanism 1: Thread subclass
-        SubclassThread t1 = new SubclassThread();
-        t1.start();
-        t1.join();
-        System.out.println("Subclass thread done, state: " + t1.getState());
-
-        // Mechanism 2: Runnable on a named Thread
-        Thread t2 = new Thread(new RunnableTask(), "runnable-thread");
-        t2.start();
-        // Interrupt it shortly after starting to show interrupt handling
-        Thread.sleep(50);
-        t2.interrupt();
-        t2.join();
-        System.out.println("Runnable thread done, state: " + t2.getState());
-
-        // Mechanism 3: Callable wrapped in FutureTask
-        FutureTask<Long> futureTask = new FutureTask<>(new SumCallable(1_000_000));
-        Thread t3 = new Thread(futureTask, "callable-thread");
-        t3.start();
-        t3.join();
-        Long result = futureTask.get();
-        System.out.println("Callable result: sum(1..1000000) = " + result);
-        System.out.println("Callable thread done, state: " + t3.getState());
-    }
-}
-```
-
-Run: `javac ThreeWaysDemo.java && java ThreeWaysDemo`
 
 ## Gotchas
 

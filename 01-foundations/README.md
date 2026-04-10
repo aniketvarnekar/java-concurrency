@@ -13,7 +13,7 @@ This section builds the conceptual foundation for Java concurrency. It covers wh
 
 ## Examples
 
-| File | Description |
-|------|-------------|
-| [examples/ThreadLifecycleDemo.java](examples/ThreadLifecycleDemo.java) | Demonstrates all six Thread.State values with live state printing |
-| [examples/CreatingThreadsDemo.java](examples/CreatingThreadsDemo.java) | Demonstrates Thread subclass, Runnable, and Callable + FutureTask |
+| Folder | Description |
+|--------|-------------|
+| [examples/threadlifecycledemo](examples/threadlifecycledemo/) | Demonstrates all six Thread.State values with live state printing |
+| [examples/creatingthreadsdemo](examples/creatingthreadsdemo/) | Demonstrates Thread subclass, Runnable, and Callable + FutureTask |

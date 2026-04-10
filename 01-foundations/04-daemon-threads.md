@@ -60,11 +60,7 @@ This inheritance behavior is a common source of bugs in thread pool libraries. A
 
 ### JVM Shutdown Behavior
 
-When the last user thread terminates, the JVM begins its shutdown sequence:
-
-1. Registered shutdown hooks are started (as user threads). These run concurrently.
-2. If `System.runFinalizersOnExit(true)` was called (deprecated and not recommended), finalizers run.
-3. The JVM halts, abandoning all daemon threads at whatever point they are executing.
+When the last user thread terminates, the JVM begins its shutdown sequence. Registered shutdown hooks are started as user threads and run concurrently. If `System.runFinalizersOnExit(true)` was called (deprecated and not recommended), finalizers run next. The JVM then halts, abandoning all daemon threads at whatever point they are executing.
 
 Daemon threads do not get a chance to finish their current task, run `finally` blocks, or flush buffers. A daemon thread writing to a file may leave a partial, corrupted file. A daemon thread holding a lock will release it abruptly when the JVM exits, but any resource it was protecting may be in an inconsistent state.
 
@@ -86,76 +82,6 @@ Shutdown hooks are the correct mechanism for daemon-thread-adjacent cleanup. Reg
 Any thread created by a daemon thread is itself a daemon thread by default due to status inheritance. This cascades: an application that makes its initial worker thread a daemon effectively makes all threads spawned from that worker daemons. The entire subtree of threads created from a daemon root will be daemon threads unless explicitly overridden.
 
 This matters in practice when using thread pools. If the `ThreadFactory` used to construct a `ThreadPoolExecutor` creates daemon threads, all tasks submitted to that pool run on daemon threads. If those tasks spawn additional threads, those are daemon threads too.
-
-## Code Snippet
-
-This program runs two scenarios. In the first, a daemon thread is running when the main user thread exits — the JVM exits without waiting for the daemon thread to finish. In the second, a user thread keeps the JVM alive until it completes its work.
-
-```java
-public class DaemonDemo {
-
-    public static void main(String[] args) throws InterruptedException {
-        System.out.println("=== Scenario 1: Daemon thread abandoned on exit ===");
-        scenarioDaemon();
-
-        // Brief pause so output from scenario 1 settles before scenario 2.
-        Thread.sleep(300);
-
-        System.out.println("\n=== Scenario 2: User thread keeps JVM alive ===");
-        scenarioUser();
-    }
-
-    static void scenarioDaemon() throws InterruptedException {
-        Thread daemon = new Thread(() -> {
-            for (int i = 1; i <= 20; i++) {
-                System.out.println("  [daemon] step " + i);
-                try { Thread.sleep(80); } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
-            }
-            // This line may never print if the JVM exits first.
-            System.out.println("  [daemon] finished all steps");
-        }, "daemon-worker");
-
-        daemon.setDaemon(true);
-        daemon.start();
-
-        // Main thread (user) sleeps briefly, then returns from this method.
-        // After main() returns, the JVM exits, abandoning the daemon thread.
-        Thread.sleep(200); // daemon will only complete ~2-3 steps
-        System.out.println("  [main] returning from scenarioDaemon()");
-        // The daemon thread is still running but will be abandoned when
-        // scenario 2 finishes and main() returns.
-    }
-
-    static void scenarioUser() throws InterruptedException {
-        Thread user = new Thread(() -> {
-            for (int i = 1; i <= 5; i++) {
-                System.out.println("  [user-worker] step " + i);
-                try { Thread.sleep(80); } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
-            }
-            System.out.println("  [user-worker] finished all steps — JVM may now exit");
-        }, "user-worker");
-
-        user.setDaemon(false); // explicit, though false is already the default
-        user.start();
-
-        System.out.println("  [main] started user-worker, now returning from scenarioUser()");
-        // Even though main returns from scenarioUser(), the JVM waits for
-        // user-worker to finish because it is a user thread.
-        user.join(); // wait here so we can print the final message cleanly
-        System.out.println("  [main] user-worker is done");
-    }
-}
-```
-
-Run: `javac DaemonDemo.java && java DaemonDemo`
-
-Expected behavior: the daemon-worker thread will be cut short when the JVM exits. The user-worker thread will run to completion because the JVM waits for all user threads before exiting.
 
 ## Gotchas
 
