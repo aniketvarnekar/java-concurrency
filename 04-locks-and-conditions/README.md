@@ -14,8 +14,8 @@ The `java.util.concurrent.locks` package provides explicit locking primitives th
 
 ## Contents — Examples
 
-| File | Description |
-|------|-------------|
-| [examples/ReentrantLockDemo.java](examples/ReentrantLockDemo.java) | Shows basic lock/unlock, tryLock deadlock avoidance, and lockInterruptibly |
-| [examples/ReadWriteLockDemo.java](examples/ReadWriteLockDemo.java) | Demonstrates concurrent readers, exclusive writer, and lock downgrading |
-| [examples/StampedLockDemo.java](examples/StampedLockDemo.java) | Shows optimistic reads with validate() fallback and write locking on a 2D point |
+| Folder | Description |
+|--------|-------------|
+| [examples/reentrantlockdemo/](examples/reentrantlockdemo/) | Shows basic lock/unlock, tryLock deadlock avoidance, and lockInterruptibly |
+| [examples/readwritelockdemo/](examples/readwritelockdemo/) | Demonstrates concurrent readers, exclusive writer, and lock downgrading |
+| [examples/stampedlockdemo/](examples/stampedlockdemo/) | Shows optimistic reads with validate() fallback and write locking on a 2D point |
