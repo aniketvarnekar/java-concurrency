@@ -142,66 +142,6 @@ int after  = counter.updateAndGet(x -> x + 10);  // after  == 15
 int before = counter.getAndUpdate(x -> x + 10);  // before == 15, counter is now 25
 ```
 
-## Code Snippet
-
-```java
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicIntegerArray;
-
-/**
- * Demonstrates AtomicInteger as a shared counter, AtomicBoolean as a one-shot
- * initialization guard, and AtomicIntegerArray for per-index thread-local counters.
- *
- * Run: javac 01-atomic-primitives.md  (see AtomicCounterDemo.java for runnable version)
- */
-public class AtomicPrimitivesSnippet {
-    static final int THREADS = 8;
-    static final int INCREMENTS_PER_THREAD = 100_000;
-
-    static final AtomicInteger sharedCounter = new AtomicInteger(0);
-    static final AtomicBoolean initialized   = new AtomicBoolean(false);
-    static final AtomicIntegerArray perThread = new AtomicIntegerArray(THREADS);
-
-    public static void main(String[] args) throws InterruptedException {
-        CountDownLatch latch = new CountDownLatch(THREADS);
-
-        for (int t = 0; t < THREADS; t++) {
-            final int id = t;
-            Thread thread = new Thread(() -> {
-                // One-shot initialization: only one thread will execute this block.
-                if (initialized.compareAndSet(false, true)) {
-                    System.out.println(Thread.currentThread().getName()
-                            + " performing one-time initialization");
-                }
-
-                for (int i = 0; i < INCREMENTS_PER_THREAD; i++) {
-                    sharedCounter.incrementAndGet();
-                    perThread.incrementAndGet(id);
-                }
-                latch.countDown();
-            }, "worker-" + t);
-            thread.start();
-        }
-
-        latch.await();
-
-        int expected = THREADS * INCREMENTS_PER_THREAD;
-        int actual   = sharedCounter.get();
-        System.out.println("Expected: " + expected + ", Actual: " + actual
-                + ", Correct: " + (expected == actual));
-
-        int perThreadSum = 0;
-        for (int t = 0; t < THREADS; t++) {
-            perThreadSum += perThread.get(t);
-        }
-        System.out.println("Per-thread sum: " + perThreadSum
-                + ", Matches total: " + (perThreadSum == actual));
-    }
-}
-```
-
 ## Gotchas
 
 ### Compound operations are not atomic

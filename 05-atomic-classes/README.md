@@ -15,7 +15,7 @@ Understanding atomic classes requires understanding Compare-And-Swap (CAS), the 
 
 ## Contents — Examples
 
-| File | Description |
+| Folder | Description |
 |---|---|
-| [examples/AtomicCounterDemo.java](examples/AtomicCounterDemo.java) | Multi-threaded counter using AtomicInteger, one-shot flag with AtomicBoolean, and per-index counters with AtomicIntegerArray |
-| [examples/CASDemo.java](examples/CASDemo.java) | Manual CAS loop, ABA problem demonstration with AtomicReference, and fix with AtomicStampedReference |
+| [examples/atomiccounterdemo/](examples/atomiccounterdemo/) | Multi-threaded counter using AtomicInteger, one-shot flag with AtomicBoolean, and per-index counters with AtomicIntegerArray |
+| [examples/casdemo/](examples/casdemo/) | Manual CAS loop correctness, ABA problem with AtomicReference, and fix with AtomicStampedReference |
