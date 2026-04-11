@@ -85,64 +85,6 @@ Returns the number of parties currently blocked in `await()`. Useful in monitori
 System.out.println("Waiting parties: " + barrier.getNumberWaiting());
 ```
 
-## Code Snippet
-
-Four worker threads process data in three phases. The barrier action announces each phase completion and accumulates a running total.
-
-```java
-import java.util.Random;
-import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.CyclicBarrier;
-import java.util.concurrent.atomic.AtomicInteger;
-
-public class MatrixPhaseDemo {
-    private static final int WORKERS = 4;
-    private static final int PHASES  = 3;
-    private static final Random RNG  = new Random();
-
-    public static void main(String[] args) throws InterruptedException {
-        int[] phaseNum = {1};
-        AtomicInteger phaseTotal = new AtomicInteger();
-        int[] workerResults = new int[WORKERS];
-
-        CyclicBarrier barrier = new CyclicBarrier(WORKERS, () -> {
-            int total = 0;
-            for (int r : workerResults) total += r;
-            System.out.printf("=== Phase %d complete — aggregated result: %d ===%n",
-                phaseNum[0]++, total);
-            phaseTotal.set(0);
-        });
-
-        Thread[] workers = new Thread[WORKERS];
-        for (int i = 0; i < WORKERS; i++) {
-            final int id = i;
-            workers[i] = new Thread(() -> {
-                String name = Thread.currentThread().getName();
-                try {
-                    for (int phase = 1; phase <= PHASES; phase++) {
-                        // Simulate per-phase work
-                        int result = RNG.nextInt(100);
-                        Thread.sleep(100 + RNG.nextInt(300));
-                        workerResults[id] = result;
-                        System.out.printf("[%s] phase %d done (result=%d)%n",
-                            name, phase, result);
-                        barrier.await();
-                    }
-                    System.out.println("[" + name + "] all phases complete");
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                } catch (BrokenBarrierException e) {
-                    System.err.println("[" + name + "] barrier broken");
-                }
-            }, "worker-" + (i + 1));
-        }
-
-        for (Thread w : workers) w.start();
-        for (Thread w : workers) w.join();
-    }
-}
-```
-
 ## Gotchas
 
 `BrokenBarrierException` propagates to all waiting threads when one thread is interrupted. One bad thread breaks the barrier for everyone. Production code must decide whether to call `reset()` and retry the phase or abort the computation. Simply catching the exception and continuing into the next phase without resetting leaves the barrier in an inconsistent state for all remaining threads.

@@ -119,49 +119,6 @@ prepareData();
 signal.release();  // unblocks consumer
 ```
 
-## Code Snippet
-
-A connection pool guarded by a `Semaphore` with 3 permits. Eight threads compete for slots, hold them for a random duration, and release them.
-
-```java
-import java.util.Random;
-import java.util.concurrent.Semaphore;
-
-public class ConnectionPoolDemo {
-    private static final int POOL_SIZE = 3;
-    private static final int THREADS   = 8;
-    private static final Random RNG    = new Random();
-    private static final Semaphore pool = new Semaphore(POOL_SIZE, true);
-
-    public static void main(String[] args) throws InterruptedException {
-        Thread[] threads = new Thread[THREADS];
-        for (int i = 1; i <= THREADS; i++) {
-            final int id = i;
-            threads[i - 1] = new Thread(() -> {
-                String name = Thread.currentThread().getName();
-                System.out.println("[" + name + "] waiting for connection...");
-                try {
-                    pool.acquire();
-                    System.out.printf("[%s] acquired connection (available: %d)%n",
-                        name, pool.availablePermits());
-                    Thread.sleep(200 + RNG.nextInt(400));
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                } finally {
-                    pool.release();
-                    System.out.printf("[%s] released connection (available: %d)%n",
-                        name, pool.availablePermits());
-                }
-            }, "Thread-" + id);
-        }
-        for (Thread t : threads) t.start();
-        for (Thread t : threads) t.join();
-        System.out.println("All threads done. Final permits: " + pool.availablePermits());
-    }
-}
-```
-
 ## Gotchas
 
 `Semaphore` is not reentrant. A thread that calls `acquire()` twice will block on the second call even though it already holds a permit, because the semaphore tracks permit counts, not thread ownership. This differs fundamentally from `ReentrantLock` and `synchronized`, which allow the holding thread to re-enter. Wrapping a non-reentrant `Semaphore` in a class that may call back into its own acquisition logic is a common source of deadlocks.

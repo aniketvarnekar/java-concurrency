@@ -88,56 +88,6 @@ end.await();  // coordinator blocks here until all N workers are done
 
 `CountDownLatch` cannot be reset. Once the count reaches zero it stays at zero permanently. Any new `await()` calls return immediately without blocking. For reusable barriers, use `CyclicBarrier`. For dynamic party counts or multiple phases, use `Phaser`.
 
-## Code Snippet
-
-The following program combines both patterns: a start-gate latch (count=1) releases 5 runner threads simultaneously, and an end-gate latch (count=5) waits for all runners to finish.
-
-```java
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.util.Random;
-import java.util.concurrent.CountDownLatch;
-
-public class RaceDemo {
-    private static final DateTimeFormatter FMT =
-        DateTimeFormatter.ofPattern("HH:mm:ss.SSS");
-    private static final Random RNG = new Random();
-
-    public static void main(String[] args) throws InterruptedException {
-        final int N = 5;
-        CountDownLatch startGate = new CountDownLatch(1);
-        CountDownLatch endGate   = new CountDownLatch(N);
-
-        for (int i = 1; i <= N; i++) {
-            final int id = i;
-            new Thread(() -> {
-                String name = Thread.currentThread().getName();
-                try {
-                    System.out.println("[" + name + "] waiting to start");
-                    startGate.await();
-                    System.out.println("[" + name + "] started at "
-                        + LocalTime.now().format(FMT));
-                    Thread.sleep(100 + RNG.nextInt(400));
-                    System.out.println("[" + name + "] finished at "
-                        + LocalTime.now().format(FMT));
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                } finally {
-                    endGate.countDown();
-                }
-            }, "runner-" + id).start();
-        }
-
-        Thread.sleep(500);  // ensure all runners are in await() before release
-        System.out.println("[Main] releasing runners...");
-        startGate.countDown();
-
-        endGate.await();
-        System.out.println("[Main] all runners finished");
-    }
-}
-```
-
 ## Gotchas
 
 `CountDownLatch` cannot be reused. Once the count reaches zero, it stays at zero permanently. Any new `await()` calls return immediately. If you need to reset the barrier after each phase, use `CyclicBarrier` instead. A common mistake is to allocate a new `CountDownLatch` inside a loop but forget to wait on the previous one, creating a logic error that is difficult to reproduce under normal load.

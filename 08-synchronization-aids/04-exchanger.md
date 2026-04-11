@@ -66,64 +66,6 @@ Drainer:  [drain buffer B1] <─────── │ ────────�
 
 Adjacent stages in a processing pipeline can use an `Exchanger` to hand off work items without a queue. Stage 1 produces an item, stage 2 presents its previously received item (now processed) and receives the new one. This creates zero-copy handoff with natural backpressure: stage 1 blocks until stage 2 is ready to receive.
 
-## Code Snippet
-
-A filler thread fills a list, swaps with a drainer thread, and the drainer processes the list. The exchange repeats four times, with each thread handing back an empty list in exchange for a full one.
-
-```java
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.Exchanger;
-
-public class DoubleBufferDemo {
-    private static final int ROUNDS  = 4;
-    private static final int ITEMS   = 5;
-
-    public static void main(String[] args) throws InterruptedException {
-        Exchanger<List<Integer>> exchanger = new Exchanger<>();
-
-        Thread filler = new Thread(() -> {
-            String name = Thread.currentThread().getName();
-            List<Integer> buffer = new ArrayList<>();
-            try {
-                for (int round = 1; round <= ROUNDS; round++) {
-                    buffer.clear();
-                    for (int i = 1; i <= ITEMS; i++) buffer.add(round * 10 + i);
-                    System.out.println("[" + name + "] filled: " + buffer);
-                    buffer = exchanger.exchange(buffer);
-                    System.out.println("[" + name + "] received back: " + buffer
-                        + " (size=" + buffer.size() + ", should be empty)");
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }, "filler");
-
-        Thread drainer = new Thread(() -> {
-            String name = Thread.currentThread().getName();
-            List<Integer> buffer = new ArrayList<>();
-            try {
-                for (int round = 1; round <= ROUNDS; round++) {
-                    buffer = exchanger.exchange(buffer);
-                    int sum = buffer.stream().mapToInt(Integer::intValue).sum();
-                    System.out.println("[" + name + "] drained: " + buffer
-                        + " sum=" + sum);
-                    buffer = new ArrayList<>();  // hand back a fresh empty list
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        }, "drainer");
-
-        filler.start();
-        drainer.start();
-        filler.join();
-        drainer.join();
-        System.out.println("Exchange complete");
-    }
-}
-```
-
 ## Gotchas
 
 `Exchanger` is strictly two-party. Using one `Exchanger` for more than two threads does not distribute work evenly; it creates arbitrary pairings based on arrival order and leaves any unpaired thread blocked indefinitely if there is an odd number of callers. For fan-out or broadcast patterns, use `CountDownLatch` or `CyclicBarrier` instead.

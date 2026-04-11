@@ -16,10 +16,10 @@ Rather than replacing locks, these utilities sit above them. They express intent
 | [04-exchanger.md](./04-exchanger.md) | Two-party synchronous object swap for pipeline handoff |
 | [05-phaser.md](./05-phaser.md) | Dynamic multi-phase barrier generalizing CountDownLatch and CyclicBarrier |
 
-### Example Files
+### Examples
 
-| File | Description |
+| Folder | Description |
 |---|---|
-| [CountDownLatchDemo.java](./examples/CountDownLatchDemo.java) | Start-gate and end-gate patterns with CountDownLatch |
-| [CyclicBarrierDemo.java](./examples/CyclicBarrierDemo.java) | Multi-phase simulation with barrier action |
-| [SemaphoreDemo.java](./examples/SemaphoreDemo.java) | Connection pool guarded by Semaphore |
+| [examples/countdownlatchdemo/](examples/countdownlatchdemo/) | Start-gate and end-gate patterns with CountDownLatch |
+| [examples/cyclicbarrierdemo/](examples/cyclicbarrierdemo/) | Multi-phase simulation with barrier action |
+| [examples/semaphoredemo/](examples/semaphoredemo/) | Connection pool guarded by Semaphore |
