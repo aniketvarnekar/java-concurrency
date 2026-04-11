@@ -17,7 +17,7 @@ The patterns here build on the primitives covered in earlier sections (locks, at
 
 ## Contents — Examples
 
-| File | Description |
-|------|-------------|
-| [examples/ProducerConsumerDemo.java](examples/ProducerConsumerDemo.java) | Two producers, three consumers, ArrayBlockingQueue, poison pill shutdown with timestamps |
-| [examples/ThreadLocalDemo.java](examples/ThreadLocalDemo.java) | Per-thread transaction ID isolation and remove() cleanup in simulated thread pool |
+| Folder | Description |
+|--------|-------------|
+| [examples/producerconsumerdemo/](examples/producerconsumerdemo/) | Two producers, three consumers, ArrayBlockingQueue, poison pill shutdown with timestamps |
+| [examples/threadlocaldemo/](examples/threadlocaldemo/) | Per-thread request context isolation and remove() cleanup to prevent memory leaks |

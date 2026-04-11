@@ -1,17 +1,31 @@
-/**
- * Demonstrates ThreadLocal for per-thread request context and memory leak prevention.
+/*
+ * ThreadLocalDemo — Main
  *
- * Run: javac ThreadLocalDemo.java && java ThreadLocalDemo
+ * Demonstrates two ThreadLocal use cases:
+ *
+ * Part 1 — Per-thread request context isolation:
+ *   Three handler threads each process two requests. CURRENT_USER is set per-request
+ *   and removed in a finally block. The "Between requests" print confirms the value
+ *   is null after removal — no cross-request contamination.
+ *
+ * Part 2 — Memory leak without remove():
+ *   requestWithLeak sets a 512 KB value without calling remove(). The second check
+ *   on the same thread shows the stale value still present, simulating the thread-pool
+ *   leak scenario where a pooled thread carries one request's context into the next.
+ *   requestFixed shows the correct pattern: always remove in a finally block.
  */
+package examples.threadlocaldemo;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 
-public class ThreadLocalDemo {
+public class Main {
 
-    // ---------------------------------------------------------------
-    // Part 1: Per-thread request context isolation
-    // ---------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Part 1: Per-thread request context
+    // -------------------------------------------------------------------------
+
     static final ThreadLocal<String> CURRENT_USER =
             ThreadLocal.withInitial(() -> null);
 
@@ -21,64 +35,52 @@ public class ThreadLocalDemo {
         try {
             System.out.printf("[%s] handling request for user: %s%n",
                     Thread.currentThread().getName(), CURRENT_USER.get());
-            Thread.sleep(30); // simulate processing
-            // Any nested call can retrieve the context without parameter passing
+            Thread.sleep(30);
+            // Any nested call retrieves the correct user without a parameter
             processInner();
         } finally {
-            // Must remove in finally — even if an exception is thrown
+            // Mandatory: remove before the thread returns to the pool, otherwise
+            // the next request on this thread will see the previous user's value.
             CURRENT_USER.remove();
         }
     }
 
     static void processInner() {
-        // No user parameter needed — context is thread-local
+        // No user parameter needed — identity is thread-local
         System.out.printf("[%s]   inner processing, user is still: %s%n",
                 Thread.currentThread().getName(), CURRENT_USER.get());
     }
 
-    // ---------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // Part 2: Memory leak demonstration
-    // ---------------------------------------------------------------
+    // -------------------------------------------------------------------------
+
     static final ThreadLocal<byte[]> LARGE_CONTEXT =
             ThreadLocal.withInitial(() -> null);
 
-    /**
-     * Simulates a request handler that sets a large ThreadLocal value
-     * but forgets to call remove(). The value persists on the thread
-     * after the "request" completes.
-     */
     static void requestWithLeak(int requestNum) {
         LARGE_CONTEXT.set(new byte[512 * 1024]); // 512 KB
         System.out.printf("[%s] Request %d: set 512KB context value (no remove)%n",
                 Thread.currentThread().getName(), requestNum);
-        // ... do work ...
-        // BUG: no remove() call — value stays in thread's ThreadLocalMap
+        // BUG: no remove() — value stays in the thread's ThreadLocalMap
     }
 
-    /**
-     * Shows the stale value visible on the second request.
-     */
     static void showStaleLeak() {
         requestWithLeak(1);
-        // Simulate thread returning to pool and picking up request 2
-        // Request 2 does NOT call set() first — it gets the stale value
+        // Simulate the thread being returned to a pool and picking up request 2.
+        // Request 2 does not call set() first — it receives the stale 512KB value.
         byte[] stale = LARGE_CONTEXT.get();
         System.out.printf("[%s] Request 2 (no set called): LARGE_CONTEXT is %s%n",
                 Thread.currentThread().getName(),
-                stale != null ? "NON-NULL (stale leak! " + stale.length / 1024 + " KB)" : "null");
-        // Clean up for demo purposes
-        LARGE_CONTEXT.remove();
+                stale != null ? "NON-NULL (stale leak, " + stale.length / 1024 + "KB)" : "null");
+        LARGE_CONTEXT.remove(); // clean up so demo is self-contained
     }
 
-    /**
-     * Fixed version: always removes in finally block.
-     */
     static void requestFixed(int requestNum) {
         try {
             LARGE_CONTEXT.set(new byte[512 * 1024]); // 512 KB
             System.out.printf("[%s] Request %d: set 512KB context value (with remove in finally)%n",
                     Thread.currentThread().getName(), requestNum);
-            // ... do work ...
         } finally {
             LARGE_CONTEXT.remove(); // value is now eligible for GC
         }
@@ -86,22 +88,21 @@ public class ThreadLocalDemo {
 
     static void showFixed() {
         requestFixed(1);
-        // Thread returns to pool and picks up request 2
+        // After the fixed version, the thread's slot is clean for the next request.
         byte[] value = LARGE_CONTEXT.get();
         System.out.printf("[%s] Request 2 (after fixed request 1): LARGE_CONTEXT is %s%n",
                 Thread.currentThread().getName(),
                 value == null ? "null (clean)" : "non-null (unexpected)");
     }
 
-    // ---------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // Main
-    // ---------------------------------------------------------------
-    public static void main(String[] args) throws InterruptedException {
-        System.out.println("=== Part 1: Per-thread context isolation ===\n");
+    // -------------------------------------------------------------------------
 
-        int numThreads = 3;
+    public static void main(String[] args) throws InterruptedException {
+        int numThreads       = 3;
         int requestsPerThread = 2;
-        CountDownLatch done = new CountDownLatch(numThreads);
+        CountDownLatch done  = new CountDownLatch(numThreads);
         List<Thread> handlers = new ArrayList<>();
 
         for (int t = 1; t <= numThreads; t++) {
@@ -110,9 +111,8 @@ public class ThreadLocalDemo {
                 try {
                     for (int r = 1; r <= requestsPerThread; r++) {
                         handleRequest(threadNum, r);
-                        // After handleRequest returns, CURRENT_USER is removed
-                        // Verify isolation: get() returns null between requests
-                        System.out.printf("[%s] Between requests: CURRENT_USER = %s%n",
+                        // Verify isolation: after remove(), get() returns null
+                        System.out.printf("[%s] between requests: CURRENT_USER = %s%n",
                                 Thread.currentThread().getName(), CURRENT_USER.get());
                     }
                 } catch (InterruptedException e) {
@@ -127,18 +127,12 @@ public class ThreadLocalDemo {
         handlers.forEach(Thread::start);
         done.await();
 
-        System.out.println("\n=== Part 2: Memory leak without remove() ===\n");
-
-        Thread leakThread = new Thread(ThreadLocalDemo::showStaleLeak, "request-handler-leak");
+        Thread leakThread = new Thread(Main::showStaleLeak, "leak-demo-thread");
         leakThread.start();
         leakThread.join();
 
-        System.out.println("\n=== Part 2: Fixed version with remove() in finally ===\n");
-
-        Thread fixedThread = new Thread(ThreadLocalDemo::showFixed, "request-handler-fixed");
+        Thread fixedThread = new Thread(Main::showFixed, "fixed-demo-thread");
         fixedThread.start();
         fixedThread.join();
-
-        System.out.println("\nDone.");
     }
 }
