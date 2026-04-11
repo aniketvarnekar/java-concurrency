@@ -19,8 +19,8 @@ Prerequisites: familiarity with the Java memory model, `java.util.concurrent` pr
 
 ### Examples
 
-| File | Description |
+| Folder | Description |
 |---|---|
-| [ForkJoinDemo.java](./examples/ForkJoinDemo.java) | Parallel array sum using RecursiveTask |
-| [VirtualThreadsDemo.java](./examples/VirtualThreadsDemo.java) | Virtual thread creation, scale, and pinning demonstration |
-| [StructuredConcurrencyDemo.java](./examples/StructuredConcurrencyDemo.java) | ShutdownOnFailure and ShutdownOnSuccess with StructuredTaskScope |
+| [examples/forkjoindemo/](examples/forkjoindemo/) | Parallel array sum using RecursiveTask, comparing custom pool vs commonPool |
+| [examples/virtualthreadsdemo/](examples/virtualthreadsdemo/) | Virtual thread scale, executor usage, and pinning vs ReentrantLock |
+| [examples/structuredconcurrencydemo/](examples/structuredconcurrencydemo/) | ShutdownOnFailure and ShutdownOnSuccess with StructuredTaskScope |

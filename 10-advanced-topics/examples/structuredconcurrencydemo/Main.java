@@ -1,62 +1,66 @@
-/**
- * Demonstrates StructuredTaskScope.ShutdownOnFailure and ShutdownOnSuccess.
+/*
+ * StructuredConcurrencyDemo — Main
  *
- * Shows:
- *   - ShutdownOnFailure: parallel fetch of user + orders; one fails, both cancelled,
- *     exception propagated to caller
- *   - ShutdownOnSuccess: two redundant service calls; fastest wins, other cancelled
+ * Demonstrates two StructuredTaskScope shutdown policies:
  *
- * Run:
- *   javac --enable-preview --release 21 StructuredConcurrencyDemo.java
- *   java  --enable-preview StructuredConcurrencyDemo
+ * ShutdownOnFailure (all-or-nothing):
+ *   fetchUser and fetchOrders run concurrently. fetchOrders throws after 300ms.
+ *   The scope cancels fetchUser, and throwIfFailed() re-throws the exception
+ *   to the caller. Neither subtask can outlive the scope block.
  *
- * Requires Java 21+ with preview features enabled.
+ * ShutdownOnSuccess (hedging / first-wins):
+ *   callServiceA (400ms) and callServiceB (150ms) race. ServiceB wins;
+ *   the scope cancels ServiceA by interrupting it. scope.result() returns
+ *   the winning value after scope.join() returns.
+ *
+ * The thread names in each print confirm that subtasks run on virtual threads
+ * managed by the scope, not on the caller's thread.
+ *
+ * Requires Java 21+.
  */
+package examples.structuredconcurrencydemo;
+
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.StructuredTaskScope;
 
-public class StructuredConcurrencyDemo {
+public class Main {
 
     public static void main(String[] args) {
-        System.out.println("=== Demo 1: ShutdownOnFailure ===");
         try {
             String result = fetchUserAndOrders();
             System.out.println("Result: " + result);
         } catch (Exception e) {
             System.out.println("Caught: " + e.getClass().getSimpleName()
-                               + " — " + e.getMessage());
+                    + " — " + e.getMessage());
         }
 
         System.out.println();
-        System.out.println("=== Demo 2: ShutdownOnSuccess ===");
+
         try {
             String winner = queryRedundantServices();
             System.out.println("Winner: " + winner);
         } catch (Exception e) {
             System.out.println("Caught: " + e.getClass().getSimpleName()
-                               + " — " + e.getMessage());
+                    + " — " + e.getMessage());
         }
     }
 
-    // ------------------------------------------------------------------
-    // Demo 1: ShutdownOnFailure
-    // Fetch user data and order data in parallel.
-    // If either subtask fails, the scope shuts down and the exception
-    // propagates to the caller.
-    // ------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // ShutdownOnFailure: both subtasks must succeed; one failure cancels all.
+    // -------------------------------------------------------------------------
     static String fetchUserAndOrders() throws InterruptedException, ExecutionException {
         try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
 
             StructuredTaskScope.Subtask<String> userTask =
-                scope.fork(() -> fetchUser());
+                    scope.fork(Main::fetchUser);
 
             StructuredTaskScope.Subtask<String> ordersTask =
-                scope.fork(() -> fetchOrders());
+                    scope.fork(Main::fetchOrders);
 
-            scope.join()           // wait for completion policy
-                 .throwIfFailed(); // rethrow first failure as ExecutionException
+            scope.join()           // block until policy is satisfied
+                 .throwIfFailed(); // re-throw first failure as ExecutionException
 
-            // Both succeeded — safe to call .get()
+            // Only reached if both subtasks succeeded
             return userTask.get() + " with " + ordersTask.get();
         }
     }
@@ -71,35 +75,34 @@ public class StructuredConcurrencyDemo {
     static String fetchOrders() throws InterruptedException {
         System.out.println("  [order-service]  starting  on " + Thread.currentThread().getName());
         Thread.sleep(300);
-        // Simulate a service failure
+        // Simulate a downstream service failure
         System.out.println("  [order-service]  FAILING   on " + Thread.currentThread().getName());
         throw new RuntimeException("orders service unavailable");
     }
 
-    // ------------------------------------------------------------------
-    // Demo 2: ShutdownOnSuccess
-    // Query two redundant services; return the first successful result
-    // and cancel the other.
-    // ------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // ShutdownOnSuccess: first successful subtask wins; the other is cancelled.
+    // -------------------------------------------------------------------------
     static String queryRedundantServices() throws InterruptedException {
         try (var scope = new StructuredTaskScope.ShutdownOnSuccess<String>()) {
 
-            scope.fork(() -> callServiceA());
-            scope.fork(() -> callServiceB());
+            scope.fork(Main::callServiceA);
+            scope.fork(Main::callServiceB);
 
-            scope.join(); // waits until one succeeds (or all fail)
+            scope.join(); // returns when the first subtask succeeds
 
-            return scope.result(); // returns first successful result
+            return scope.result(); // returns the winning value
         }
     }
 
     static String callServiceA() throws InterruptedException {
         System.out.println("  [service-A] starting  on " + Thread.currentThread().getName());
         try {
-            Thread.sleep(400); // slower
+            Thread.sleep(400); // slower path
             System.out.println("  [service-A] completed on " + Thread.currentThread().getName());
             return "result-from-A";
         } catch (InterruptedException e) {
+            // Scope cancelled this subtask because another succeeded first
             System.out.println("  [service-A] cancelled on " + Thread.currentThread().getName());
             throw e;
         }
@@ -108,7 +111,7 @@ public class StructuredConcurrencyDemo {
     static String callServiceB() throws InterruptedException {
         System.out.println("  [service-B] starting  on " + Thread.currentThread().getName());
         try {
-            Thread.sleep(150); // faster
+            Thread.sleep(150); // faster path
             System.out.println("  [service-B] completed on " + Thread.currentThread().getName());
             return "result-from-B";
         } catch (InterruptedException e) {
