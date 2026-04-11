@@ -13,6 +13,6 @@ Testing concurrent code requires a different mindset than testing sequential cod
 
 ## Contents — Examples
 
-| File | Description |
+| Folder | Description |
 |---|---|
-| [examples/JCStressExamples.java](examples/JCStressExamples.java) | Simulates jcstress-style actor/outcome testing without the harness; demonstrates the design pattern |
+| [examples/jcstressdemo/](examples/jcstressdemo/) | Simulates jcstress-style actor/outcome testing without the harness; demonstrates the design pattern |

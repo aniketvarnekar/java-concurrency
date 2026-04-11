@@ -111,68 +111,6 @@ top -H -p 12345
 printf '%x\n' 6699    # → 1a2b
 ```
 
-## Code Snippet
-
-```java
-/**
- * Creates artificial lock contention for profiling demonstration.
- * Run for 30 seconds, then profile with async-profiler or JFR.
- *
- * async-profiler lock profile:
- *   ./profiler.sh -e lock -d 30 -f lock-flame.html <pid>
- *
- * JFR recording:
- *   jcmd <pid> JFR.start duration=30s filename=lock-contention.jfr
- *   jcmd <pid> JFR.dump filename=lock-contention.jfr
- *   # Open lock-contention.jfr in JDK Mission Control
- *
- * Run: javac LockContentionDemo.java && java LockContentionDemo
- */
-import java.util.concurrent.locks.ReentrantLock;
-
-public class LockContentionDemo {
-
-    static final ReentrantLock LOCK  = new ReentrantLock();
-    static volatile long       count = 0;
-
-    public static void main(String[] args) throws InterruptedException {
-        int threadCount = 8;
-        Thread[] threads = new Thread[threadCount];
-
-        for (int i = 0; i < threadCount; i++) {
-            final int id = i;
-            threads[i] = new Thread(() -> {
-                long endTime = System.currentTimeMillis() + 30_000L;
-                while (System.currentTimeMillis() < endTime) {
-                    LOCK.lock();
-                    try {
-                        // Hold lock for 10ms — creates contention
-                        Thread.sleep(10);
-                        count++;
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        break;
-                    } finally {
-                        LOCK.unlock();
-                    }
-                }
-                System.out.println("Thread-" + id + " finished, count=" + count);
-            }, "contention-thread-" + i);
-        }
-
-        System.out.println("Starting " + threadCount + " threads. PID: " +
-            ProcessHandle.current().pid());
-        System.out.println("Profile now with async-profiler or JFR.");
-        System.out.println("Running for 30 seconds...");
-
-        for (Thread t : threads) t.start();
-        for (Thread t : threads) t.join();
-
-        System.out.println("Done. Total count: " + count);
-    }
-}
-```
-
 ## Gotchas
 
 ### async-profiler requires OS-level permissions
