@@ -70,68 +70,6 @@ Iterators, `keySet()`, `values()`, `entrySet()`, `forEach`, and bulk operations 
 | Performance under contention | N/A | Poor | Poor | High |
 | size() accuracy | Exact | Exact | Exact | Approximate |
 
-## Code Snippet
-
-```java
-import java.util.Arrays;
-import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
-
-/**
- * Word frequency count using ConcurrentHashMap.merge and computeIfAbsent.
- * Multiple threads each process a slice of a shared word list.
- */
-public class WordFrequency {
-
-    public static void main(String[] args) throws InterruptedException {
-        List<String> words = Arrays.asList(
-            "apple", "banana", "apple", "cherry", "banana", "apple",
-            "date", "cherry", "banana", "date", "apple", "date"
-        );
-
-        ConcurrentHashMap<String, Integer> frequency = new ConcurrentHashMap<>();
-
-        // computeIfAbsent: lazily create a per-word entry (demonstrates the API)
-        // merge: atomically add 1 to existing count, or insert 1 if absent
-        int threadCount = 3;
-        int sliceSize = words.size() / threadCount;
-        ExecutorService pool = Executors.newFixedThreadPool(threadCount);
-
-        for (int t = 0; t < threadCount; t++) {
-            final int start = t * sliceSize;
-            final int end = (t == threadCount - 1) ? words.size() : start + sliceSize;
-            final int threadId = t;
-
-            pool.submit(() -> {
-                Thread.currentThread().setName("counter-" + threadId);
-                for (int i = start; i < end; i++) {
-                    String word = words.get(i);
-                    frequency.merge(word, 1, Integer::sum);
-                }
-            });
-        }
-
-        pool.shutdown();
-        pool.awaitTermination(5, TimeUnit.SECONDS);
-
-        System.out.println("Word frequencies:");
-        frequency.entrySet().stream()
-            .sorted(java.util.Map.Entry.<String, Integer>comparingByValue().reversed())
-            .forEach(e -> System.out.printf("  %-10s %d%n", e.getKey(), e.getValue()));
-
-        // putIfAbsent for caching — only computes if absent
-        ConcurrentHashMap<String, String> cache = new ConcurrentHashMap<>();
-        frequency.forEach((word, count) -> {
-            cache.putIfAbsent(word, "first-seen-count=" + count);
-        });
-        System.out.println("\nCache entries: " + cache.size());
-    }
-}
-```
-
 ## Gotchas
 
 ### Compound Check-Then-Act Is Not Atomic
