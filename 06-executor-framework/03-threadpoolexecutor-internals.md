@@ -123,69 +123,6 @@ ThreadFactory factory = new ThreadFactory() {
 
 Creates all core threads before any tasks arrive. Useful to warm up a pool so that the first batch of tasks does not pay the cost of thread creation. Without prestarting, threads are created on demand as tasks arrive up to corePoolSize.
 
-## Code Snippet
-
-```java
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
-
-public class ThreadPoolExecutorInternalsDemo {
-
-    static class NamedThreadFactory implements ThreadFactory {
-        private final AtomicInteger count = new AtomicInteger(1);
-
-        @Override
-        public Thread newThread(Runnable r) {
-            Thread t = new Thread(r, "pool-worker-" + count.getAndIncrement());
-            t.setUncaughtExceptionHandler((thread, ex) ->
-                    System.err.println("[UncaughtException] " + thread.getName() + ": " + ex.getMessage()));
-            return t;
-        }
-    }
-
-    public static void main(String[] args) throws InterruptedException {
-        ThreadPoolExecutor executor = new ThreadPoolExecutor(
-                2,                             // corePoolSize
-                4,                             // maximumPoolSize
-                5L, TimeUnit.SECONDS,          // keepAlive for extra threads
-                new ArrayBlockingQueue<>(3),   // bounded queue — fills after 3 tasks
-                new NamedThreadFactory(),
-                new ThreadPoolExecutor.CallerRunsPolicy() // backpressure when saturated
-        );
-
-        System.out.println("Pool configured: core=2, max=4, queue=3, policy=CallerRuns");
-        System.out.println("Submitting 10 tasks...");
-        System.out.println();
-
-        for (int i = 1; i <= 10; i++) {
-            final int taskId = i;
-            System.out.printf("[main] submitting task-%d | pool=%d active=%d queued=%d%n",
-                    taskId,
-                    executor.getPoolSize(),
-                    executor.getActiveCount(),
-                    executor.getQueue().size());
-            executor.submit(() -> {
-                System.out.printf("[%s] task-%d started%n",
-                        Thread.currentThread().getName(), taskId);
-                try { Thread.sleep(500); } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                }
-                System.out.printf("[%s] task-%d finished%n",
-                        Thread.currentThread().getName(), taskId);
-            });
-        }
-
-        System.out.println("\n[main] all tasks submitted, initiating shutdown");
-        executor.shutdown();
-        executor.awaitTermination(30, TimeUnit.SECONDS);
-
-        System.out.printf("%nFinal stats — completedTasks=%d%n",
-                executor.getCompletedTaskCount());
-        System.out.println("Demo complete.");
-    }
-}
-```
-
 ## Gotchas
 
 **maximumPoolSize only comes into effect after the work queue is full.** With an unbounded LinkedBlockingQueue (used by newFixedThreadPool and newSingleThreadExecutor), the queue never fills and maximumPoolSize is never exceeded regardless of its value. Setting maximumPoolSize=100 on a pool with an unbounded queue provides no protection against bottlenecks — all tasks queue up behind the core threads.

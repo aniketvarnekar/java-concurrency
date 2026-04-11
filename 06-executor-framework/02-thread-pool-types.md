@@ -77,52 +77,6 @@ ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
 | newScheduledThreadPool(n) | n | MAX_INT | DelayedWorkQueue | 0 | Unchecked exception suppresses future runs |
 | newVirtualThreadPerTaskExecutor() | N/A | N/A | N/A | N/A | Pinning with synchronized |
 
-## Code Snippet
-
-```java
-import java.util.concurrent.*;
-
-public class ThreadPoolTypesDemo {
-
-    static void submitAndAwait(ExecutorService pool, String poolName) throws InterruptedException {
-        System.out.printf("%nPool: %s%nActual class: %s%n", poolName, pool.getClass().getName());
-        for (int i = 1; i <= 5; i++) {
-            final int taskId = i;
-            pool.submit(() -> {
-                System.out.printf("  [%s] task-%d running on %s%n",
-                        poolName, taskId, Thread.currentThread().getName());
-                try { Thread.sleep(50); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
-            });
-        }
-        pool.shutdown();
-        pool.awaitTermination(10, TimeUnit.SECONDS);
-    }
-
-    public static void main(String[] args) throws InterruptedException {
-        submitAndAwait(Executors.newFixedThreadPool(2),      "FixedThreadPool(2)");
-        submitAndAwait(Executors.newCachedThreadPool(),      "CachedThreadPool");
-        submitAndAwait(Executors.newSingleThreadExecutor(),  "SingleThreadExecutor");
-        submitAndAwait(Executors.newWorkStealingPool(2),     "WorkStealingPool(2)");
-
-        // ScheduledThreadPool: run 3 immediate tasks via execute, then shut down
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(2);
-        System.out.printf("%nPool: ScheduledThreadPool(2)%nActual class: %s%n",
-                scheduler.getClass().getName());
-        for (int i = 1; i <= 5; i++) {
-            final int taskId = i;
-            scheduler.schedule(() -> {
-                System.out.printf("  [ScheduledPool] task-%d running on %s%n",
-                        taskId, Thread.currentThread().getName());
-            }, 0, TimeUnit.MILLISECONDS);
-        }
-        scheduler.shutdown();
-        scheduler.awaitTermination(10, TimeUnit.SECONDS);
-
-        System.out.println("\nAll pools shut down.");
-    }
-}
-```
-
 ## Gotchas
 
 **newFixedThreadPool and newSingleThreadExecutor use an unbounded LinkedBlockingQueue — tasks pile up indefinitely under overload.** If the consumers (pool threads) are slower than the producers (task submitters), the queue grows without bound. There is no rejection policy, no backpressure, and no warning. The heap is exhausted silently and OutOfMemoryError appears in the thread submitting the task or in the garbage collector thread, often far from the root cause.

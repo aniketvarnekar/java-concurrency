@@ -17,8 +17,8 @@ This section covers the full breadth of the framework: the `Executor` and `Execu
 
 ## Contents — Examples
 
-| File | Description |
+| Folder | Description |
 |---|---|
-| [examples/ThreadPoolDemo.java](examples/ThreadPoolDemo.java) | Custom ThreadPoolExecutor with bounded queue, CallerRunsPolicy, and named ThreadFactory |
-| [examples/FutureDemo.java](examples/FutureDemo.java) | Callable submission, Future.get() with timeout, cancellation, and invokeAll |
-| [examples/CompletableFutureDemo.java](examples/CompletableFutureDemo.java) | Async pipeline using supplyAsync, thenCompose, thenCombine, exceptionally, and whenComplete |
+| [examples/threadpooldemo/](examples/threadpooldemo/) | Custom ThreadPoolExecutor with bounded queue, CallerRunsPolicy, and named ThreadFactory |
+| [examples/futuredemo/](examples/futuredemo/) | Callable submission, Future.get() with timeout, cancellation, and invokeAll |
+| [examples/completablefuturedemo/](examples/completablefuturedemo/) | Async pipeline using supplyAsync, thenCompose, thenCombine, exceptionally, and whenComplete |

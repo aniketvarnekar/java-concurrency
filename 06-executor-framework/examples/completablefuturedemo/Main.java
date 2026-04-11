@@ -1,18 +1,31 @@
-/**
- * Demonstrates CompletableFuture pipeline: supplyAsync, thenApplyAsync, thenCompose,
- * thenCombine, exceptionally, whenComplete.
+/*
+ * CompletableFutureDemo — Main
  *
- * Run: javac CompletableFutureDemo.java && java CompletableFutureDemo
+ * Demonstrates a multi-stage async pipeline using CompletableFuture composition:
+ *   - supplyAsync: starts computation on an executor thread
+ *   - thenApplyAsync: transforms result on an executor thread (vs thenApply which runs on
+ *     whichever thread completed the previous stage)
+ *   - thenCompose: flat-maps one async stage into another (avoids CompletableFuture<CF<T>>)
+ *   - thenCombine: merges two independent futures when both complete
+ *   - exceptionally: recovery point — runs only if the chain threw; provides a fallback value
+ *   - whenComplete: side-effect hook — runs on success and failure, does not transform result
+ *
+ * The log() calls include the current thread name to show which executor thread runs each
+ * stage. The discount fetch runs in parallel with the user pipeline — the elapsed time
+ * printed at the end confirms this overlap.
+ *
+ * The second pipeline demonstrates the failure propagation path: thenApplyAsync is skipped
+ * entirely when the upstream stage threw, and exceptionally intercepts the exception.
  */
+package examples.completablefuturedemo;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class CompletableFutureDemo {
+public class Main {
 
-    // Custom named thread pool — explicit executor for all async stages
     static final AtomicInteger THREAD_COUNT = new AtomicInteger(1);
     static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(4, r -> {
         Thread t = new Thread(r, "cf-worker-" + THREAD_COUNT.getAndIncrement());
@@ -20,7 +33,7 @@ public class CompletableFutureDemo {
     });
 
     // -------------------------------------------------------------------------
-    // Simulated async service calls
+    // Simulated async service calls — each sleeps to represent IO latency
     // -------------------------------------------------------------------------
 
     static String fetchUser() {
@@ -52,14 +65,14 @@ public class CompletableFutureDemo {
     }
 
     static String mergeOrdersAndDiscount(List<String> orders, double discount) {
-        log("mergeResult START");
+        log("merge START");
         String result = "orders=" + orders + " discount=" + (int)(discount * 100) + "%";
-        log("mergeResult DONE → " + result);
+        log("merge DONE → " + result);
         return result;
     }
 
     // -------------------------------------------------------------------------
-    // Helper utilities
+    // Helpers
     // -------------------------------------------------------------------------
 
     static void log(String msg) {
@@ -71,7 +84,8 @@ public class CompletableFutureDemo {
         catch (InterruptedException e) { Thread.currentThread().interrupt(); }
     }
 
-    // Wrap an InterruptedException-throwing supplier for use in supplyAsync lambdas
+    // Wraps a checked-exception-throwing supplier for use inside supplyAsync lambdas,
+    // which require an unchecked Supplier. CompletionException is the correct wrapper.
     static <T> T wrap(CheckedSupplier<T> supplier) {
         try { return supplier.get(); }
         catch (Exception e) { throw new CompletionException(e); }
@@ -81,99 +95,76 @@ public class CompletableFutureDemo {
     interface CheckedSupplier<T> { T get() throws Exception; }
 
     // -------------------------------------------------------------------------
-    // Main demos
+    // Main
     // -------------------------------------------------------------------------
 
     public static void main(String[] args) throws InterruptedException {
-        System.out.println("=== Demo 1: Full async pipeline ===\n");
         runSuccessPipeline();
-
-        System.out.println("\n=== Demo 2: Failure path — exceptionally recovers ===\n");
         runFailurePipeline();
 
         EXECUTOR.shutdown();
         EXECUTOR.awaitTermination(10, TimeUnit.SECONDS);
-        System.out.println("\nAll demos complete.");
     }
 
+    // Pipeline: fetchUser → enrichUser → fetchOrders + fetchDiscount (parallel) → merge
     static void runSuccessPipeline() throws InterruptedException {
         long start = System.currentTimeMillis();
 
-        // Stage: fetch discount runs independently in parallel with the user pipeline
+        // Discount runs in parallel with the user pipeline — no dependency between them.
         CompletableFuture<Double> discountFuture = CompletableFuture
-                .supplyAsync(() -> wrap(CompletableFutureDemo::fetchDiscount), EXECUTOR);
+                .supplyAsync(() -> wrap(Main::fetchDiscount), EXECUTOR);
 
         CompletableFuture<String> pipeline = CompletableFuture
-                // Stage 1: supplyAsync — fetch user (runs on EXECUTOR thread)
-                .supplyAsync(() -> wrap(CompletableFutureDemo::fetchUser), EXECUTOR)
-
-                // Stage 2: thenApplyAsync — enrich user (transform on EXECUTOR thread)
+                .supplyAsync(() -> wrap(Main::fetchUser), EXECUTOR)
                 .thenApplyAsync(userId -> wrap(() -> enrichUser(userId)), EXECUTOR)
-
-                // Stage 3: thenCompose — fetch orders (another async stage, flat-mapped)
                 .thenCompose(userInfo -> CompletableFuture.supplyAsync(
                         () -> wrap(() -> fetchOrders(userInfo)), EXECUTOR))
-
-                // Stage 4: thenCombine — merge orders with discount (both must complete)
-                .thenCombine(discountFuture,
-                        CompletableFutureDemo::mergeOrdersAndDiscount)
-
-                // Stage 5: exceptionally — fallback value on any pipeline exception
+                .thenCombine(discountFuture, Main::mergeOrdersAndDiscount)
                 .exceptionally(t -> {
                     log("exceptionally: caught " + t.getCause().getMessage()
                             + " → returning default-response");
                     return "default-response";
                 })
-
-                // Stage 6: whenComplete — side-effect log (does not transform result)
                 .whenComplete((result, err) -> {
-                    if (err != null)
-                        log("whenComplete: FAILED — " + err.getMessage());
-                    else
-                        log("whenComplete: SUCCESS — " + result);
+                    if (err != null) log("whenComplete: FAILED — " + err.getMessage());
+                    else             log("whenComplete: SUCCESS — " + result);
                 });
 
-        String result = pipeline.join(); // block until pipeline completes
-        long elapsed = System.currentTimeMillis() - start;
-        System.out.printf("%nFinal result: %s  (elapsed: %dms)%n", result, elapsed);
-        System.out.println("Note: parallel stages (user pipeline + discount) overlap in time.");
+        String result  = pipeline.join();
+        long   elapsed = System.currentTimeMillis() - start;
+        System.out.printf("final result: %s  (elapsed: %dms)%n", result, elapsed);
     }
 
-    static void runFailurePipeline() throws InterruptedException {
+    // Failure path: upstream stage throws; thenApplyAsync is skipped; exceptionally recovers.
+    static void runFailurePipeline() {
         CompletableFuture<String> failing = CompletableFuture
-                // Stage 1: throws immediately
                 .supplyAsync(() -> {
-                    log("failingStage: about to throw");
+                    log("failingStage: throwing service-unavailable");
                     throw new CompletionException(new RuntimeException("service-unavailable"));
                 }, EXECUTOR)
 
-                // Stage 2: skipped because previous stage threw
+                // This stage is skipped because the previous stage threw.
                 .thenApplyAsync(s -> {
-                    log("thenApply: this should NOT run (upstream threw)");
+                    log("thenApply: skipped (upstream threw)");
                     return s.toUpperCase();
                 }, EXECUTOR)
 
-                // Stage 3: exceptionally — recovery point
                 .exceptionally(t -> {
                     log("exceptionally: recovering from " + t.getCause().getMessage());
                     return "fallback-value";
                 })
 
-                // Stage 4: runs after recovery — result is now "fallback-value"
+                // Runs after recovery — the pipeline continues with "fallback-value".
                 .thenApplyAsync(s -> {
                     log("thenApply after recovery: result = " + s);
                     return s + "-enriched";
                 }, EXECUTOR)
 
-                // Side-effect log
                 .whenComplete((result, err) -> {
-                    if (err != null)
-                        log("whenComplete: FAILED — " + err.getMessage());
-                    else
-                        log("whenComplete: result after recovery = " + result);
+                    if (err != null) log("whenComplete: FAILED — " + err.getMessage());
+                    else             log("whenComplete: result after recovery = " + result);
                 });
 
-        String result = failing.join();
-        System.out.println("Failure path final result: " + result);
+        System.out.println("failure path result: " + failing.join());
     }
 }
