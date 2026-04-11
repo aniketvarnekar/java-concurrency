@@ -1,26 +1,25 @@
 /*
  * StructuredConcurrencyDemo — Main
  *
- * Demonstrates two StructuredTaskScope shutdown policies:
+ * Demonstrates two StructuredTaskScope join policies (Java 25 API):
  *
- * ShutdownOnFailure (all-or-nothing):
+ * Joiner.awaitAllSuccessfulOrThrow() (all-or-nothing):
  *   fetchUser and fetchOrders run concurrently. fetchOrders throws after 300ms.
- *   The scope cancels fetchUser, and throwIfFailed() re-throws the exception
- *   to the caller. Neither subtask can outlive the scope block.
+ *   scope.join() throws FailedException (unchecked), which cancels fetchUser.
+ *   Neither subtask can outlive the scope block.
  *
- * ShutdownOnSuccess (hedging / first-wins):
+ * Joiner.anySuccessfulResultOrThrow() (hedging / first-wins):
  *   callServiceA (400ms) and callServiceB (150ms) race. ServiceB wins;
- *   the scope cancels ServiceA by interrupting it. scope.result() returns
- *   the winning value after scope.join() returns.
+ *   the scope cancels ServiceA by interrupting it. scope.join() returns
+ *   the winning value directly.
  *
  * The thread names in each print confirm that subtasks run on virtual threads
  * managed by the scope, not on the caller's thread.
  *
- * Requires Java 21+.
+ * Requires Java 25+ (StructuredTaskScope is a preview feature).
  */
 package examples.structuredconcurrencydemo;
 
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.StructuredTaskScope;
 
 public class Main {
@@ -46,10 +45,11 @@ public class Main {
     }
 
     // -------------------------------------------------------------------------
-    // ShutdownOnFailure: both subtasks must succeed; one failure cancels all.
+    // awaitAllSuccessfulOrThrow: both subtasks must succeed; one failure cancels all.
     // -------------------------------------------------------------------------
-    static String fetchUserAndOrders() throws InterruptedException, ExecutionException {
-        try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
+    static String fetchUserAndOrders() throws InterruptedException {
+        try (var scope = StructuredTaskScope.open(
+                StructuredTaskScope.Joiner.<String>awaitAllSuccessfulOrThrow())) {
 
             StructuredTaskScope.Subtask<String> userTask =
                     scope.fork(Main::fetchUser);
@@ -57,8 +57,8 @@ public class Main {
             StructuredTaskScope.Subtask<String> ordersTask =
                     scope.fork(Main::fetchOrders);
 
-            scope.join()           // block until policy is satisfied
-                 .throwIfFailed(); // re-throw first failure as ExecutionException
+            // Blocks until all subtasks complete; throws FailedException if any failed.
+            scope.join();
 
             // Only reached if both subtasks succeeded
             return userTask.get() + " with " + ordersTask.get();
@@ -81,17 +81,17 @@ public class Main {
     }
 
     // -------------------------------------------------------------------------
-    // ShutdownOnSuccess: first successful subtask wins; the other is cancelled.
+    // anySuccessfulResultOrThrow: first successful subtask wins; the other is cancelled.
     // -------------------------------------------------------------------------
     static String queryRedundantServices() throws InterruptedException {
-        try (var scope = new StructuredTaskScope.ShutdownOnSuccess<String>()) {
+        try (var scope = StructuredTaskScope.open(
+                StructuredTaskScope.Joiner.<String>anySuccessfulResultOrThrow())) {
 
             scope.fork(Main::callServiceA);
             scope.fork(Main::callServiceB);
 
-            scope.join(); // returns when the first subtask succeeds
-
-            return scope.result(); // returns the winning value
+            // Blocks until the first subtask succeeds; returns its result directly.
+            return scope.join();
         }
     }
 

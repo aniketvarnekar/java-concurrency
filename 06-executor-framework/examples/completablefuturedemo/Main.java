@@ -138,7 +138,7 @@ public class Main {
     // Failure path: upstream stage throws; thenApplyAsync is skipped; exceptionally recovers.
     static void runFailurePipeline() {
         CompletableFuture<String> failing = CompletableFuture
-                .supplyAsync(() -> {
+                .<String>supplyAsync(() -> {
                     log("failingStage: throwing service-unavailable");
                     throw new CompletionException(new RuntimeException("service-unavailable"));
                 }, EXECUTOR)
