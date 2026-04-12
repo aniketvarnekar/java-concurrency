@@ -12,15 +12,16 @@ public class Main {
     public static void main(String[] args) throws InterruptedException {
 
         // NEW: the Thread object exists but start() has not been called.
-        Thread newThread = new Thread(() -> {}, "lifecycle-new");
-        System.out.println("NEW:           " + newThread.getState());
+        Thread newThread = new Thread(() -> {
+        }, "lifecycle-new");
+        System.out.println(newThread.getName() + ":           " + newThread.getState());
 
         // RUNNABLE: thread is registered with the scheduler and eligible to run.
         BusyTask busyTask = new BusyTask();
         Thread runnableThread = new Thread(busyTask, "lifecycle-runnable");
         runnableThread.start();
         Thread.sleep(50); // observation window — not a synchronization guarantee
-        System.out.println("RUNNABLE:      " + runnableThread.getState());
+        System.out.println(runnableThread.getName() + ":      " + runnableThread.getState());
         busyTask.done = true;
         runnableThread.join();
 
@@ -30,7 +31,7 @@ public class Main {
         synchronized (blockLock) {
             blockedThread.start();
             Thread.sleep(50);
-            System.out.println("BLOCKED:       " + blockedThread.getState());
+            System.out.println(blockedThread.getName() + ":       " + blockedThread.getState());
             // exiting this block releases the lock; blockedThread will proceed
         }
         blockedThread.join();
@@ -41,7 +42,7 @@ public class Main {
         Thread waitingThread = new Thread(waitingTask, "lifecycle-waiting");
         waitingThread.start();
         Thread.sleep(50);
-        System.out.println("WAITING:       " + waitingThread.getState());
+        System.out.println(waitingThread.getName() + ":       " + waitingThread.getState());
         synchronized (waitLock) {
             waitingTask.notified = true;
             waitLock.notify();
@@ -52,14 +53,15 @@ public class Main {
         Thread sleepingThread = new Thread(new SleepingTask(), "lifecycle-timed-waiting");
         sleepingThread.start();
         Thread.sleep(50);
-        System.out.println("TIMED_WAITING: " + sleepingThread.getState());
+        System.out.println(sleepingThread.getName() + ": " + sleepingThread.getState());
         sleepingThread.interrupt(); // SleepingTask restores the flag and exits cleanly
         sleepingThread.join();
 
         // TERMINATED: run() has returned; the thread cannot be restarted.
-        Thread termThread = new Thread(() -> {}, "lifecycle-terminated");
+        Thread termThread = new Thread(() -> {
+        }, "lifecycle-terminated");
         termThread.start();
         termThread.join();
-        System.out.println("TERMINATED:    " + termThread.getState());
+        System.out.println(termThread.getName() + ":    " + termThread.getState());
     }
 }
