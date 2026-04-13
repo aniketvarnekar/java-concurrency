@@ -52,9 +52,9 @@ public class Main {
         final int TRIALS = 20;
         int racesDetected = 0;
 
+        ExpensiveResource.resetConstructionCount();
         for (int trial = 0; trial < TRIALS; trial++) {
             shared = null;
-            ExpensiveResource.resetConstructionCount();
 
             // CyclicBarrier releases both threads simultaneously to maximize
             // the probability they both observe null before either writes.
