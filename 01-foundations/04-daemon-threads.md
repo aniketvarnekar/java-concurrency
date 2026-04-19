@@ -60,7 +60,7 @@ This inheritance behavior is a common source of bugs in thread pool libraries. A
 
 ### JVM Shutdown Behavior
 
-When the last user thread terminates, the JVM begins its shutdown sequence. Registered shutdown hooks are started as user threads and run concurrently. If `System.runFinalizersOnExit(true)` was called (deprecated and not recommended), finalizers run next. The JVM then halts, abandoning all daemon threads at whatever point they are executing.
+When the last user thread terminates, the JVM begins its shutdown sequence. Registered shutdown hooks are started as user threads and run concurrently. If `System.runFinalizersOnExit(true)` was called (removed in Java 9 — not available in modern Java), finalizers run next. The JVM then halts, abandoning all daemon threads at whatever point they are executing.
 
 Daemon threads do not get a chance to finish their current task, run `finally` blocks, or flush buffers. A daemon thread writing to a file may leave a partial, corrupted file. A daemon thread holding a lock will release it abruptly when the JVM exits, but any resource it was protecting may be in an inconsistent state.
 

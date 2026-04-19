@@ -2,11 +2,11 @@
 
 ## Overview
 
-Structured concurrency (`java.util.concurrent.StructuredTaskScope`, Java 21) imposes a tree-shaped lifetime structure on concurrent tasks. A scope is opened, subtasks are forked inside it, and the scope closes only after all subtasks have either completed or been cancelled. No subtask can outlive the scope that created it. This prevents the most common form of task leak in unstructured async code — where a task submitted to an `ExecutorService` or a `CompletableFuture` chain continues running after the caller that submitted it has returned, failed, or been cancelled.
+Structured concurrency (`java.util.concurrent.StructuredTaskScope`, Java 25 preview) imposes a tree-shaped lifetime structure on concurrent tasks. A scope is opened, subtasks are forked inside it, and the scope closes only after all subtasks have either completed or been cancelled. No subtask can outlive the scope that created it. This prevents the most common form of task leak in unstructured async code — where a task submitted to an `ExecutorService` or a `CompletableFuture` chain continues running after the caller that submitted it has returned, failed, or been cancelled.
 
 The problem with unstructured concurrency is that it breaks the relationship between task lifetimes and code structure. A method that submits three tasks to an `ExecutorService` and returns a result has no guaranteed way to ensure those tasks are cancelled if an exception is thrown. `CompletableFuture` chains that outlive their callers can hold resources, retain thread pool workers, and produce results that no one is waiting for. Error propagation across independent async tasks requires explicit coordination that is easy to omit. Structured concurrency makes these properties automatic: the scope boundary is the lifetime boundary.
 
-Structured concurrency is designed primarily for virtual threads. A scope forks subtasks as virtual threads, and the scope's own thread waits at `join()` until the scope's completion policy is satisfied. Because virtual threads are cheap, one virtual thread per subtask is the natural model. The two built-in policies — `ShutdownOnFailure` and `ShutdownOnSuccess` — cover the two most common fan-out patterns: all-or-nothing (fail if any subtask fails) and first-wins (succeed as soon as any subtask succeeds).
+Structured concurrency is designed primarily for virtual threads. A scope forks subtasks as virtual threads, and the scope's own thread waits at `join()` until the scope's completion policy is satisfied. Because virtual threads are cheap, one virtual thread per subtask is the natural model. The two built-in join policies — `awaitAllSuccessfulOrThrow` and `anySuccessfulResultOrThrow` — cover the two most common fan-out patterns: all-or-nothing (fail if any subtask fails) and first-wins (succeed as soon as any subtask succeeds).
 
 ## Key Concepts
 
@@ -19,29 +19,30 @@ A `CompletableFuture` chain can outlive its caller. If `fetchUser()` and `fetchO
 `StructuredTaskScope` is a `try-with-resources` resource. It is opened at the top of a block and closed automatically at the end. The `fork(Callable<V>)` method submits a subtask as a new virtual thread and returns a `Subtask<V>` handle. `join()` blocks until the scope's completion policy declares the scope done (either a timeout is reached or the policy's condition is satisfied). `close()` — called by try-with-resources — ensures that all forked subtasks are cancelled (via `Thread.interrupt()`) and awaited before the scope is fully closed.
 
 ```java
-try (var scope = new StructuredTaskScope.ShutdownOnFailure()) {
-    Subtask<String> user   = scope.fork(() -> fetchUser(userId));
-    Subtask<List<Order>> orders = scope.fork(() -> fetchOrders(userId));
-    scope.join().throwIfFailed(); // blocks; propagates first failure
+try (var scope = StructuredTaskScope.open(
+        StructuredTaskScope.Joiner.<Object>awaitAllSuccessfulOrThrow())) {
+    var user   = scope.fork(() -> fetchUser(userId));
+    var orders = scope.fork(() -> fetchOrders(userId));
+    scope.join(); // blocks; throws FailedException if any subtask fails
     return new UserProfile(user.get(), orders.get());
 }
 // Both subtasks are guaranteed to have finished by here
 ```
 
-### `ShutdownOnFailure`
+### `awaitAllSuccessfulOrThrow`
 
-`ShutdownOnFailure` implements the all-or-nothing fan-out policy. When any subtask throws an exception, the scope shuts down: all remaining subtasks receive an `InterruptedException` (via `Thread.interrupt()`), and `join()` — after returning — throws the first subtask's exception when `throwIfFailed()` is called on the returned `Outcome`. This is appropriate when all results are required: if any dependency fails, there is no point in waiting for the others.
+`Joiner.awaitAllSuccessfulOrThrow()` implements the all-or-nothing fan-out policy. When any subtask throws an exception, the scope shuts down: all remaining subtasks receive an interrupt, and `scope.join()` throws `StructuredTaskScope.FailedException` (unchecked) wrapping the first failure. This is appropriate when all results are required: if any dependency fails, there is no point in waiting for the others.
 
-### `ShutdownOnSuccess`
+### `anySuccessfulResultOrThrow`
 
-`ShutdownOnSuccess` implements the first-wins (hedging) policy. When any subtask completes successfully, the scope shuts down and cancels remaining subtasks. After `join()` returns, `result()` returns the first successful result. This is appropriate for hedged requests: send the same request to multiple redundant services and accept the fastest response, discarding the rest.
+`Joiner.anySuccessfulResultOrThrow()` implements the first-wins (hedging) policy. When any subtask completes successfully, the scope shuts down and cancels remaining subtasks. `scope.join()` returns the first successful result directly. This is appropriate for hedged requests: send the same request to multiple redundant services and accept the fastest response, discarding the rest.
 
 ```java
-try (var scope = new StructuredTaskScope.ShutdownOnSuccess<String>()) {
+try (var scope = StructuredTaskScope.open(
+        StructuredTaskScope.Joiner.<String>anySuccessfulResultOrThrow())) {
     scope.fork(() -> callServiceA());
     scope.fork(() -> callServiceB());
-    scope.join(); // returns when first succeeds
-    return scope.result(); // the winning result
+    return scope.join(); // returns the first successful result directly
 }
 ```
 
@@ -63,7 +64,7 @@ Extend `StructuredTaskScope<T>` directly and override `handleComplete(Subtask<? 
 
 **Swallowing `InterruptedException` in a subtask prevents timely scope shutdown.** When a scope shuts down, it calls `Thread.interrupt()` on each running subtask's virtual thread. If the subtask catches `InterruptedException` and does not re-throw it or stop execution, the interrupt is effectively ignored. The scope's `close()` will block waiting for that subtask to finish, hanging the scope for as long as the subtask continues to run. Always re-throw `InterruptedException` or honor the interrupt by returning promptly.
 
-**`StructuredTaskScope` is a preview API in Java 21 and requires `--enable-preview` at both compile time and runtime.** Compiling without `--enable-preview --release 21` produces a compile error because the `StructuredTaskScope` class is in a preview package. Running without `--enable-preview` produces a runtime error. Both flags are required in the `javac` and `java` invocations. This requirement may change in future Java releases as structured concurrency moves out of preview.
+**`StructuredTaskScope` is a preview API in Java 25 and requires `--enable-preview` at both compile time and runtime.** Compiling without `--enable-preview --release 25` produces a compile error because the `StructuredTaskScope` class is in a preview package. Running without `--enable-preview` produces a runtime error. Both flags are required in the `javac` and `java` invocations. This requirement may change in future Java releases as structured concurrency moves out of preview.
 
 **Mixing `StructuredTaskScope` with unstructured `CompletableFuture` chains breaks the scope's lifetime guarantee.** If a forked subtask internally submits additional tasks to `ForkJoinPool.commonPool()` via `CompletableFuture.supplyAsync()` without joining them, those tasks escape the scope's control. They run beyond the scope's close, holding resources and potentially modifying state after the caller has already returned or failed. All work spawned within a scope must be forked through the scope, not submitted to external executors.
 

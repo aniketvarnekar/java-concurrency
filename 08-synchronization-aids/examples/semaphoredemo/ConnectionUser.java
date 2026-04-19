@@ -3,9 +3,9 @@
  * then releases it.
  *
  * The Semaphore enforces that at most POOL_SIZE threads hold a connection at
- * once. release() is in a finally block so the permit is always returned even
- * if the code between acquire and release throws an unchecked exception — a
- * missing release would permanently shrink the pool's effective size.
+ * once. release() is called in a finally block, but only when acquire()
+ * succeeded — releasing a permit that was never acquired would inflate the
+ * pool beyond its configured capacity.
  */
 package examples.semaphoredemo;
 
@@ -34,8 +34,13 @@ class ConnectionUser implements Runnable {
         String name = Thread.currentThread().getName();
         System.out.printf("[%s] waiting for connection...%n", name);
 
+        // Track whether acquire() succeeded. The finally block must not call
+        // release() if acquire() never returned normally — doing so would add
+        // a permit that was never taken, inflating the pool beyond its capacity.
+        boolean acquired = false;
         try {
             pool.acquire();
+            acquired = true;
 
             // Track peak concurrency to verify the semaphore limit held
             int active = activeConnections.incrementAndGet();
@@ -49,15 +54,16 @@ class ConnectionUser implements Runnable {
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            System.out.printf("[%s] interrupted while waiting%n", name);
-            return;  // do not decrement activeConnections — acquire may not have succeeded
+            System.out.printf("[%s] interrupted%n", name);
         } finally {
-            // IMPORTANT: release() is in finally so the permit is always returned
-            // even if the work between acquire() and here throws.
-            int active = activeConnections.decrementAndGet();
-            pool.release();
-            System.out.printf("[%s] released connection (available: %d, active: %d)%n",
-                    name, pool.availablePermits(), active);
+            // Only release if acquire() succeeded. If acquire() itself threw
+            // InterruptedException, no permit was obtained and none should be returned.
+            if (acquired) {
+                int active = activeConnections.decrementAndGet();
+                pool.release();
+                System.out.printf("[%s] released connection (available: %d, active: %d)%n",
+                        name, pool.availablePermits(), active);
+            }
         }
     }
 }

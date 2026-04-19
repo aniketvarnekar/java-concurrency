@@ -60,7 +60,7 @@ A thread enters `TERMINATED` (also called "dead") when its `run()` method return
                  ─── join() ──────> WAITING ─── target terminates ──────> RUNNABLE
                  ─── park() ──────> WAITING ─── unpark()/interrupt() ───> RUNNABLE
 
-        RUNNABLE ─── sleep(t) ────> TIMED_WAITING ─── timeout/notify ──> RUNNABLE
+        RUNNABLE ─── sleep(t) ────> TIMED_WAITING ─── timeout / notify (wait(t) only) / interrupt ──> RUNNABLE
                  ─── wait(t) ─────> TIMED_WAITING
                  ─── join(t) ─────> TIMED_WAITING
                  ─── parkNanos ───> TIMED_WAITING
@@ -85,7 +85,8 @@ A thread enters `TERMINATED` (also called "dead") when its `run()` method return
 | `WAITING` | `notify()` / `notifyAll()` / `unpark()` | `RUNNABLE` |
 | `WAITING` | `Thread.interrupt()` | `RUNNABLE` (throws `InterruptedException`) |
 | `TIMED_WAITING` | Timeout expires | `RUNNABLE` |
-| `TIMED_WAITING` | `notify()` / `interrupt()` before timeout | `RUNNABLE` |
+| `TIMED_WAITING` | `notify()` / `notifyAll()` before timeout (only from `Object.wait(t)`) | `RUNNABLE` |
+| `TIMED_WAITING` | `Thread.interrupt()` before timeout | `RUNNABLE` (throws `InterruptedException`) |
 
 ## Gotchas
 

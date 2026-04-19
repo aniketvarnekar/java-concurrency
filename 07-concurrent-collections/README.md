@@ -16,6 +16,6 @@ The Java platform ships a rich set of thread-safe collection classes in `java.ut
 
 | Folder | Description |
 |---|---|
-| [examples/concurrenthashmapDemo/](examples/concurrenthashmapdemo/) | Thread-safe word frequency counting using compute, merge, and putIfAbsent |
+| [examples/concurrenthashmapdemo/](examples/concurrenthashmapdemo/) | Thread-safe word frequency counting using compute, merge, and putIfAbsent |
 | [examples/blockingqueuedemo/](examples/blockingqueuedemo/) | Multi-producer multi-consumer pipeline with ArrayBlockingQueue and poison-pill shutdown |
 | [examples/copyonwritedemo/](examples/copyonwritedemo/) | Snapshot-safe iteration with CopyOnWriteArrayList vs ConcurrentModificationException with ArrayList |

@@ -99,7 +99,7 @@ public boolean transfer(Account from, Account to, int amount) {
         return false;
     } finally {
         if (fromLocked) from.lock.unlock();
-        if toLocked   to.lock.unlock();
+        if (toLocked) to.lock.unlock();
     }
 }
 ```
