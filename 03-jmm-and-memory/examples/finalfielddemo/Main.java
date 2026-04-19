@@ -48,8 +48,8 @@ public class Main {
                 return;
             }
 
-            // The volatile read of safeRef happens-before the publisher's volatile
-            // write. The final-field freeze additionally ensures x, y, and label
+            // The publisher's volatile write to safeRef happens-before this volatile
+            // read. The final-field freeze additionally ensures x, y, and label
             // are the values assigned in the constructor — never 0 or null.
             SafeHolder safe = safeRef;
             System.out.println("[reader] safe   x=" + safe.x + " y=" + safe.y + " label=" + safe.label);
