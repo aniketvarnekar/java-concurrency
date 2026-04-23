@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file is read automatically by Claude Code at the start of every session.
+This file is read automatically at the start of every session.
 It describes the project structure, conventions, and workflows for this repository.
 
 ---
@@ -19,7 +19,7 @@ The target reader is a developer who is comfortable with Java but new to concurr
 ```
 java-concurrency/
   README.md
-  CLAUDE.md
+  AGENTS.md
   NN-section-name/
     README.md
     NN-topic-name.md
@@ -177,7 +177,7 @@ Generic names like `"t1"` or `"thread1"` are not acceptable.
 2. Create `README.md`, all topic `.md` files, and `examples/` with at least
    one example folder.
 3. Update the root `README.md` contents table.
-4. Add the new section to the **Sections** table in this `CLAUDE.md`.
+4. Add the new section to the **Sections** table in this file.
 
 ### Editing an existing file
 
@@ -187,4 +187,4 @@ Generic names like `"t1"` or `"thread1"` are not acceptable.
 
 ### Updating the Java version
 
-1. Update the **Java version** section in this `CLAUDE.md`.
+1. Update the **Java version** section in this file.

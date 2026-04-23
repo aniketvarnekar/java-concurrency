@@ -50,19 +50,19 @@ Config current = config.get(); // all fields are consistent
 
 ### The ABA Problem
 
-Consider a lock-free stack backed by a linked list. Thread 1 reads the head pointer (node A). Thread 1 is then preempted. Thread 2 pops A, pops B, then pushes A back. The stack now contains only A. Thread 1 resumes and performs `compareAndSet(A, A.next)`. A.next still points to B, but B has already been removed (and possibly recycled). Thread 1's CAS succeeds, corrupting the stack.
+Consider a lock-free stack backed by a linked list. Thread 1 reads the head pointer (node A) and also reads `A.next` (node B). Thread 1 is then preempted. Thread 2 pops A, pops B, then pushes A back — during which it updates `A.next` to the current head. The stack is now `A -> C`. Thread 1 resumes and performs `head.compareAndSet(A, A.next)` using the stale `A.next` value it read earlier, which is B. B has already been removed (and possibly recycled), but Thread 1's CAS succeeds, corrupting the stack.
 
 The sequence is:
 
 ```
 Initial stack:   A -> B -> C
-Thread 1 reads:  head = A, prepares to CAS(A, B)
+Thread 1 reads:  head = A, A.next = B, prepares to CAS: head.compareAndSet(A, B)
 
 Thread 2 does:   pop A  => stack: B -> C
                  pop B  => stack: C
-                 push A => stack: A -> C  (but A.next was not updated!)
+                 push A => sets A.next = C, CAS head to A => stack: A -> C
 
-Thread 1 CAS(A, A.next):  A.next is still B (stale pointer)
+Thread 1 CAS: head.compareAndSet(A, B)  -- uses stale A.next == B
 Result:  head = B, but B is no longer in the stack => corruption
 ```
 
