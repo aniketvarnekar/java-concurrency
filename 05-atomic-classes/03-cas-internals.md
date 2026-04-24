@@ -90,7 +90,7 @@ Thread 2: push A => head -> [A] -> [C] -> null  (A.next is set to C, but
                                                   it still cached A.next = B)
 ```
 
-Thread 1 resumes and executes `CAS(head, A, A.next)`. The current head is A (it was pushed back), so the CAS succeeds. Thread 1 sets `head = B`. But B is no longer in the stack — it was popped and the memory may have been recycled. The stack is now corrupted:
+Thread 1 resumes and executes `CAS(head, A, newHead)`. The current head is A (it was pushed back), so the CAS succeeds. Thread 1 sets `head = B`. But B is no longer in the stack — it was popped and the memory may have been recycled. The stack is now corrupted:
 
 ```
 head -> [B] -> (stale)
