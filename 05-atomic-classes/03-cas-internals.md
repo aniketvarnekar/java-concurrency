@@ -167,4 +167,4 @@ Code that uses `sun.misc.Unsafe` must compute the field offset at class load tim
 
 ### Retry loops are not fair
 
-A CAS loop has no fairness guarantee. Under sustained high contention, one thread may succeed on every iteration while another retries indefinitely. Java's `synchronized` and `ReentrantLock` (in fair mode) provide ordering guarantees that a raw CAS loop does not. If fairness matters — for example, in a work queue where task ordering must be respected — a lock with fair ordering is more appropriate than a CAS loop.
+A CAS loop has no fairness guarantee. Under sustained high contention, one thread may succeed on every iteration while another retries indefinitely. `ReentrantLock` in fair mode provides strict FIFO ordering that a raw CAS loop does not; `synchronized` does not guarantee fairness either, but it avoids the CPU waste of spinning. If fairness matters — for example, in a work queue where task ordering must be respected — a lock with fair ordering is more appropriate than a CAS loop.
