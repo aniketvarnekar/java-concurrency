@@ -29,9 +29,9 @@ CompletableFuture<Integer> lengthFuture = cf.thenApply(String::length);
 CompletableFuture<Integer> asyncLength  = cf.thenApplyAsync(String::length, executor);
 ```
 
-### thenCompose(Function<T, CompletableFuture<U>>)
+### thenCompose(Function<T, CompletableFuture<U\>>)
 
-Flat-maps one async stage into another. The function takes the result of the first stage and returns a new CompletableFuture. The overall result is that inner future's value, not a nested CompletableFuture<CompletableFuture<U>>. Use thenCompose when the next step is itself an async operation; use thenApply when the transformation is synchronous.
+Flat-maps one async stage into another. The function takes the result of the first stage and returns a new CompletableFuture. The overall result is that inner future's value, not a nested CompletableFuture<CompletableFuture<U\>>. Use thenCompose when the next step is itself an async operation; use thenApply when the transformation is synchronous.
 
 ```java
 CompletableFuture<List<Order>> ordersFuture =
@@ -41,7 +41,7 @@ CompletableFuture<List<Order>> ordersFuture =
 
 ### thenCombine, allOf, anyOf
 
-thenCombine(CompletableFuture<U>, BiFunction<T,U,V>) combines two independent futures when both complete. allOf(futures...) completes when all provided futures complete; its result type is Void, so individual results must be retrieved from the original futures. anyOf(futures...) completes when the first future completes, returning an Object.
+thenCombine(CompletableFuture<U\>, BiFunction<T,U,V>) combines two independent futures when both complete. allOf(futures...) completes when all provided futures complete; its result type is Void, so individual results must be retrieved from the original futures. anyOf(futures...) completes when the first future completes, returning an Object.
 
 ```java
 CompletableFuture<String> combined = userFuture.thenCombine(prefsFuture,

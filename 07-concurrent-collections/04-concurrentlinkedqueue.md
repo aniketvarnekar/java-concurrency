@@ -69,7 +69,7 @@ It is not appropriate when you need the consumer to block until work is availabl
 
 ### No Blocking take() — Consumers Must Poll
 
-`ConcurrentLinkedQueue` has no `take()` method. Consumers must poll and handle the `null` return. Naive busy-polling at 100% CPU is wasteful. The demo above uses `Thread.yield()` as a minimal backoff; in production, a short `LockSupport.parkNanos` or a `BlockingQueue` is often the right answer if the consumer should wait when the queue is empty.
+`ConcurrentLinkedQueue` has no `take()` method. Consumers must poll and handle the `null` return. Naive busy-polling at 100% CPU is wasteful. Use `Thread.yield()` as a minimal backoff, or a short `LockSupport.parkNanos` for a less aggressive spin. If the consumer should block until work is available rather than polling at all, switch to a `BlockingQueue` such as `LinkedBlockingQueue` and call `take()`.
 
 ### Null Elements Cause NullPointerException
 

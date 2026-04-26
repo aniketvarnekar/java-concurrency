@@ -16,123 +16,124 @@
  */
 package examples.threadlocaldemo;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.*;
 
 public class Main {
 
     // -------------------------------------------------------------------------
-    // Part 1: Per-thread request context
+    // Part 1: Per-thread request context (correct usage)
     // -------------------------------------------------------------------------
 
-    static final ThreadLocal<String> CURRENT_USER =
-            ThreadLocal.withInitial(() -> null);
+    static final ThreadLocal<String> CURRENT_USER = new ThreadLocal<>();
 
-    static void handleRequest(int threadNum, int requestNum) throws InterruptedException {
-        String user = "user-" + threadNum + "-request-" + requestNum;
-        CURRENT_USER.set(user);
+    static void handleRequest(int requestNum) {
+        String user = "user-" + requestNum;
+
         try {
-            System.out.printf("[%s] handling request for user: %s%n",
+            CURRENT_USER.set(user);
+
+            System.out.printf("[%s] handling request for %s%n",
                     Thread.currentThread().getName(), CURRENT_USER.get());
-            Thread.sleep(30);
-            // Any nested call retrieves the correct user without a parameter
+
             processInner();
         } finally {
-            // Mandatory: remove before the thread returns to the pool, otherwise
-            // the next request on this thread will see the previous user's value.
+            // CRITICAL: prevent leakage when using thread pools
             CURRENT_USER.remove();
         }
     }
 
     static void processInner() {
-        // No user parameter needed — identity is thread-local
-        System.out.printf("[%s]   inner processing, user is still: %s%n",
+        System.out.printf("[%s]   inner processing user = %s%n",
                 Thread.currentThread().getName(), CURRENT_USER.get());
     }
 
     // -------------------------------------------------------------------------
-    // Part 2: Memory leak demonstration
+    // Part 2: ThreadLocal leak demonstration (REAL scenario)
     // -------------------------------------------------------------------------
 
-    static final ThreadLocal<byte[]> LARGE_CONTEXT =
-            ThreadLocal.withInitial(() -> null);
+    static final ThreadLocal<byte[]> LARGE_CONTEXT = new ThreadLocal<>();
 
-    static void requestWithLeak(int requestNum) {
-        LARGE_CONTEXT.set(new byte[512 * 1024]); // 512 KB
-        System.out.printf("[%s] Request %d: set 512KB context value (no remove)%n",
-                Thread.currentThread().getName(), requestNum);
-        // BUG: no remove() — value stays in the thread's ThreadLocalMap
-    }
+    static void leakDemo() throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(1);
 
-    static void showStaleLeak() {
-        requestWithLeak(1);
-        // Simulate the thread being returned to a pool and picking up request 2.
-        // Request 2 does not call set() first — it receives the stale 512KB value.
-        byte[] stale = LARGE_CONTEXT.get();
-        System.out.printf("[%s] Request 2 (no set called): LARGE_CONTEXT is %s%n",
-                Thread.currentThread().getName(),
-                stale != null ? "NON-NULL (stale leak, " + stale.length / 1024 + "KB)" : "null");
-        LARGE_CONTEXT.remove(); // clean up so demo is self-contained
-    }
-
-    static void requestFixed(int requestNum) {
-        try {
+        // Task 1: sets value but DOES NOT remove
+        Runnable task1 = () -> {
             LARGE_CONTEXT.set(new byte[512 * 1024]); // 512 KB
-            System.out.printf("[%s] Request %d: set 512KB context value (with remove in finally)%n",
-                    Thread.currentThread().getName(), requestNum);
-        } finally {
-            LARGE_CONTEXT.remove(); // value is now eligible for GC
-        }
+            System.out.printf("[%s] Task1: set 512KB (no remove)%n",
+                    Thread.currentThread().getName());
+        };
+
+        // Task 2: runs on SAME thread → sees stale value
+        Runnable task2 = () -> {
+            byte[] val = LARGE_CONTEXT.get();
+            System.out.printf("[%s] Task2: LARGE_CONTEXT = %s%n",
+                    Thread.currentThread().getName(),
+                    val != null
+                            ? "STALE VALUE (" + val.length / 1024 + " KB)"
+                            : "null");
+
+            // cleanup so demo doesn't pollute further runs
+            LARGE_CONTEXT.remove();
+        };
+
+        pool.submit(task1).get();
+        pool.submit(task2).get();
+
+        pool.shutdown();
     }
 
-    static void showFixed() {
-        requestFixed(1);
-        // After the fixed version, the thread's slot is clean for the next request.
-        byte[] value = LARGE_CONTEXT.get();
-        System.out.printf("[%s] Request 2 (after fixed request 1): LARGE_CONTEXT is %s%n",
-                Thread.currentThread().getName(),
-                value == null ? "null (clean)" : "non-null (unexpected)");
+    // -------------------------------------------------------------------------
+    // Part 3: Fixed version (proper cleanup)
+    // -------------------------------------------------------------------------
+
+    static void fixedDemo() throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(1);
+
+        Runnable safeTask = () -> {
+            try {
+                LARGE_CONTEXT.set(new byte[512 * 1024]);
+                System.out.printf("[%s] SafeTask: set 512KB%n",
+                        Thread.currentThread().getName());
+            } finally {
+                LARGE_CONTEXT.remove(); // FIX
+            }
+        };
+
+        Runnable verifyTask = () -> {
+            byte[] val = LARGE_CONTEXT.get();
+            System.out.printf("[%s] VerifyTask: LARGE_CONTEXT = %s%n",
+                    Thread.currentThread().getName(),
+                    val == null ? "null (clean)" : "unexpected value");
+        };
+
+        pool.submit(safeTask).get();
+        pool.submit(verifyTask).get();
+
+        pool.shutdown();
     }
 
     // -------------------------------------------------------------------------
     // Main
     // -------------------------------------------------------------------------
 
-    public static void main(String[] args) throws InterruptedException {
-        int numThreads       = 3;
-        int requestsPerThread = 2;
-        CountDownLatch done  = new CountDownLatch(numThreads);
-        List<Thread> handlers = new ArrayList<>();
+    public static void main(String[] args) throws Exception {
 
-        for (int t = 1; t <= numThreads; t++) {
-            final int threadNum = t;
-            Thread thread = new Thread(() -> {
-                try {
-                    for (int r = 1; r <= requestsPerThread; r++) {
-                        handleRequest(threadNum, r);
-                        // Verify isolation: after remove(), get() returns null
-                        System.out.printf("[%s] between requests: CURRENT_USER = %s%n",
-                                Thread.currentThread().getName(), CURRENT_USER.get());
-                    }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                } finally {
-                    done.countDown();
-                }
-            }, "request-handler-" + t);
-            handlers.add(thread);
+        System.out.println("=== Part 1: Correct ThreadLocal usage ===");
+
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+
+        for (int i = 1; i <= 4; i++) {
+            final int requestNum = i;
+            pool.submit(() -> handleRequest(requestNum));
         }
 
-        handlers.forEach(Thread::start);
-        done.await();
+        pool.shutdown();
+        pool.awaitTermination(5, TimeUnit.SECONDS);
 
-        Thread leakThread = new Thread(Main::showStaleLeak, "leak-demo-thread");
-        leakThread.start();
-        leakThread.join();
+        System.out.println("\n=== Part 2: ThreadLocal leak demo ===");
+        leakDemo();
 
-        Thread fixedThread = new Thread(Main::showFixed, "fixed-demo-thread");
-        fixedThread.start();
-        fixedThread.join();
+        System.out.println("\n=== Part 3: Fixed (with remove) ===");
+        fixedDemo();
     }
 }

@@ -75,7 +75,7 @@ Because `PriorityBlockingQueue` is unbounded, `put` never blocks. If your code r
 
 ### Null Elements Are Prohibited
 
-All `BlockingQueue` implementations reject `null` elements. `poll` and `peek` return `null` as a sentinel meaning "no element available", so allowing stored `null` would make those return values ambiguous. If you need to represent an absence of a value as a queue item, use an `Optional` wrapper or a dedicated sentinel object like the poison pill pattern shown above.
+All `BlockingQueue` implementations reject `null` elements. `poll` and `peek` return `null` as a sentinel meaning "no element available", so allowing stored `null` would make those return values ambiguous. If you need to represent an absence of a value as a queue item, use an `Optional` wrapper or a dedicated sentinel object.
 
 ### drainTo for Batch Processing
 
@@ -87,4 +87,4 @@ Calling `take` in a loop one element at a time is less efficient than calling `d
 
 ### Interrupted Threads Leave Items Unconsumed
 
-If a consumer thread is interrupted while blocked on `take`, it exits without consuming the item it was about to receive. If that item was the last item and other consumers are also stopping, it may be lost. The poison pill pattern above handles this by re-enqueuing the pill, but for general items you must decide whether to re-enqueue them, log them, or accept the loss as part of graceful shutdown.
+When a consumer thread is interrupted while blocked on `take`, `InterruptedException` is thrown before any element is removed — the item remains in the queue and another consumer can pick it up. The real risk is an item that has already been dequeued but not yet processed: if the thread is interrupted between the successful return of `take` and the completion of processing, that item is gone from the queue and will never be handled. During shutdown, prefer letting in-flight work finish before stopping consumer threads, or drain the queue explicitly with `drainTo` rather than relying on `interrupt` alone.

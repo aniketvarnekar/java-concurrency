@@ -41,10 +41,10 @@ scheduler.scheduleWithFixedDelay(task, initialDelay, delay, TimeUnit.SECONDS);
 
 ```
 scheduleAtFixedRate(period=5s):
-Task 1:  |====2s====|
-Task 2:           |====2s====|
-Task 3:                     |====2s====|
-         0         5        10        15
+Task 1:  |==2s==|
+Task 2:                 |==2s==|
+Task 3:                                  |==2s==|
+         0              5              10             15
 
 If task takes longer than period:
 Task 1:  |===========7s===========|
